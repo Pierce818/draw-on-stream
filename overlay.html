@@ -8,22 +8,30 @@
   </style>
 </head>
 <body>
-  <canvas id="overlayCanvas"></canvas>
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    const canvas = document.getElementById("overlayCanvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+<canvas id="overlayCanvas"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const canvas = document.getElementById("overlayCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-    socket.on("draw", data=>{
-      ctx.beginPath();
-      ctx.arc(data.x, data.y, data.size/2, 0, Math.PI*2);
-      ctx.fillStyle = data.color;
-      ctx.fill();
-      ctx.closePath();
-    });
-  </script>
+socket.on("draw", data=>{
+  ctx.beginPath();
+  ctx.arc(data.x, data.y, data.size/2, 0, Math.PI*2);
+  ctx.fillStyle = data.color;
+  ctx.fill();
+  ctx.closePath();
+
+  // Draw username near last stroke
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(data.user, data.x + 5, data.y - 5);
+});
+
+// Clear canvas when vote passes
+socket.on("clearCanvas", ()=>ctx.clearRect(0,0,canvas.width,canvas.height));
+</script>
 </body>
 </html>
