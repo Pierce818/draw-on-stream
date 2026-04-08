@@ -17,19 +17,29 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+let usersShown = {};
+
 socket.on("draw", data=>{
+  // Draw brush
   ctx.beginPath();
   ctx.arc(data.x, data.y, data.size/2, 0, Math.PI*2);
   ctx.fillStyle = data.color;
   ctx.fill();
   ctx.closePath();
 
-  ctx.font = "16px Arial";
-  ctx.fillStyle = "#fff";
-  ctx.fillText(data.user, data.x + 5, data.y - 5);
+  // Draw username once per user
+  if(data.firstStroke && !usersShown[data.user]){
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#fff";
+    ctx.fillText(data.user, data.x + 5, data.y - 5);
+    usersShown[data.user] = true;
+  }
 });
 
-socket.on("clearCanvas", ()=>ctx.clearRect(0,0,canvas.width,canvas.height));
+socket.on("clearCanvas", ()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  usersShown = {};
+});
 </script>
 </body>
 </html>

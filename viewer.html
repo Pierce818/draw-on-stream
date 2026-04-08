@@ -80,7 +80,7 @@ let prevX = null, prevY = null;
 
 // --- Zone info
 let zoneIndex = 0;
-let zoneWidth = 0.1; // 10% width per zone
+let zoneWidth = 0.15; // 15% width per zone
 
 // --- Username input
 const nameInput = document.getElementById("nameInput");
@@ -177,8 +177,8 @@ function draw(e){
   if(y > zoneSize) y = zoneSize;
 
   if(prevX!==null && prevY!==null){
-    // Emit to overlay
-    socket.emit("draw",{x,y,user:username,color,size:brushSize});
+    // Emit to overlay with firstStroke flag
+    socket.emit("draw",{x,y,user:username,color,size:brushSize,firstStroke: !drawStarted});
 
     // Draw locally
     drawCtx.beginPath();
@@ -193,8 +193,6 @@ function draw(e){
   prevX = x;
   prevY = y;
 }
-
-// --- Receive clear
 socket.on("clearCanvas", ()=>{
   drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   drawStarted = false;
