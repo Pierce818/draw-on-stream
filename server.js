@@ -1,42 +1,42 @@
 const express = require("express");
+const http = require("http");
 const app = express();
-const http = require("http").Server(app);
-const io = require("socket.io")(http);
+const server = http.createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(server);
 
-app.use(express.static(__dirname));
+app.use(express.static("public"));
 
-let userZones = {};
-let votes = {};
-const zoneCount = 10;
+const zoneWidth = 0.225; // 22.5% width per zone (50% bigger)
+let connectedUsers = [];
+let votesToClear = {};
 
-io.on("connection", socket=>{
-  console.log("User connected");
+io.on("connection", socket => {
+  let index = connectedUsers.length;
+  connectedUsers.push(socket.id);
 
-  // Assign unique zone
-  const usedZones = Object.values(userZones);
-  let index = 0;
-  while(usedZones.includes(index) && index < zoneCount) index++;
-  userZones[socket.id] = index;
+  // Assign zone to new user
+  socket.emit("zoneAssigned", { index, width: zoneWidth });
 
-  socket.emit("zoneAssigned",{index, width:1/zoneCount});
+  // Handle drawing
+  socket.on("draw", data => {
+    io.emit("draw", data); // broadcast to all overlays
+  });
 
-  socket.on("draw", data=> io.emit("draw", data));
-
-  socket.on("voteClear", user=>{
-    votes[socket.id] = true;
-    const voteCount = Object.keys(votes).length;
-    const majority = Math.ceil(Object.keys(userZones).length / 2);
-    if(voteCount >= majority){
+  // Handle vote to clear
+  socket.on("voteClear", username => {
+    votesToClear[username] = true;
+    // Majority vote = half+1
+    if(Object.keys(votesToClear).length >= Math.ceil(connectedUsers.length/2)){
       io.emit("clearCanvas");
-      votes = {};
+      votesToClear = {};
     }
   });
 
-  socket.on("disconnect", ()=>{
-    delete userZones[socket.id];
-    delete votes[socket.id];
+  // Handle disconnect
+  socket.on("disconnect", () => {
+    connectedUsers = connectedUsers.filter(id => id !== socket.id);
   });
 });
 
-const port = process.env.PORT || 3000;
-http.listen(port, ()=>console.log("Server running on port "+port));
+server.listen(process.env.PORT || 3000, () => console.log("Server running"));

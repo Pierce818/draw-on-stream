@@ -17,14 +17,12 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Track user lines
 let userData = {};
 
 socket.on("draw", data=>{
   if(!userData[data.user]){
     userData[data.user] = {prevX:data.x, prevY:data.y, zoneX:data.zoneStartX, zoneSize:data.zoneSize};
   } else {
-    // Draw smooth line
     ctx.beginPath();
     ctx.moveTo(userData[data.user].prevX, userData[data.user].prevY);
     ctx.lineTo(data.x, data.y);
@@ -33,12 +31,10 @@ socket.on("draw", data=>{
     ctx.lineCap = "round";
     ctx.stroke();
     ctx.closePath();
-
     userData[data.user].prevX = data.x;
     userData[data.user].prevY = data.y;
   }
 
-  // Draw username at top-left of their zone
   ctx.font = "16px Arial";
   ctx.fillStyle = "#fff";
   ctx.fillText(data.user, userData[data.user].zoneX + 5, 20);
