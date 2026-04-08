@@ -1,37 +1,29 @@
 const express = require("express");
 const app = express();
-const http = require("http").createServer(app);
-const io = require("socket.io")(http, { cors: { origin: "*" } });
+const http = require("http").Server(app);
+const io = require("socket.io")(http);
 
 app.use(express.static(__dirname));
 
-let users = [];
-const maxUsers = 10;
-const bannedWords = ["badword1","badword2","hate"]; // add more
+let connectedUsers = [];
 
-io.on("connection", (socket) => {
-  console.log("user connected");
+io.on("connection", socket=>{
+  console.log("User connected");
 
-  if (!users.includes(socket.id)) users.push(socket.id);
-  const zoneIndex = users.indexOf(socket.id);
-  const zoneWidth = 1 / maxUsers;
+  // Assign zone
+  const index = connectedUsers.length % 10; // max 10 zones
+  const width = 1 / 10;
+  connectedUsers.push(socket.id);
+  socket.emit("zoneAssigned",{index,width});
 
-  socket.emit("zoneAssigned", { index: zoneIndex, width: zoneWidth });
-
-  socket.on("draw", (data) => {
-    // block drawing if username contains banned word
-    const usernameLower = data.user.toLowerCase();
-    if(bannedWords.some(w=>usernameLower.includes(w))) return;
-
-    io.emit("draw", { ...data, zoneIndex });
+  socket.on("draw", data=>{
+    io.emit("draw", data); // send to overlay
   });
 
-  socket.on("disconnect", () => {
-    users = users.filter(id => id !== socket.id);
+  socket.on("disconnect", ()=>{
+    connectedUsers = connectedUsers.filter(id => id!==socket.id);
   });
-
-  socket.on("clear", () => io.emit("clear"));
 });
 
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log("Server running on port " + PORT));
+const port = process.env.PORT || 3000;
+http.listen(port, ()=>console.log("Server running on port "+port));

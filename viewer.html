@@ -9,7 +9,7 @@
     #controls {
       position: fixed; top:10px; left:50%; transform:translateX(-50%);
       background: rgba(0,0,0,0.6); padding:10px; border-radius:12px;
-      display:flex; gap:10px; align-items:center; z-index:1000;
+      display:flex; gap:10px; align-items:center; z-index:2000;
     }
     #controls input, #controls button { border:none; border-radius:6px; padding:4px 8px; }
     #controls input[type="text"] { width:140px; }
@@ -39,7 +39,6 @@
     Brush: <input type="range" id="brushSize" min="1" max="20" value="4" />
   </div>
 
-  <!-- Dual canvas -->
   <canvas id="drawingCanvas"></canvas>
   <canvas id="guideCanvas"></canvas>
 
@@ -66,68 +65,66 @@
     let zoneIndex = 0, zoneWidth = 1;
     const maxUsers = 10;
 
-    const bannedWords = ["badword1","badword2","hate"];
-
-    // Require username before drawing
+    // Username input
     const nameInput = document.getElementById("nameInput");
     nameInput.addEventListener("change", e=>{
       const name = e.target.value.trim();
-      if(name.length>0){
-        username=name;
-      }
+      if(name.length>0) username=name;
     });
 
-    // Color selection
+    // Color palette
     const paletteBtns = document.querySelectorAll(".color-btn");
     paletteBtns.forEach(btn=>{
-      btn.addEventListener("click",()=>{
+      btn.addEventListener("click", ()=>{
         paletteBtns.forEach(b=>b.classList.remove("selected"));
         btn.classList.add("selected");
-        color=btn.style.background;
+        color = btn.style.background;
       });
     });
     paletteBtns[0].classList.add("selected");
 
     document.getElementById("brushSize").addEventListener("input", e=>brushSize=e.target.value);
 
-    // Receive zone assignment
+    // Zone assignment from server
     socket.on("zoneAssigned", data=>{
       zoneIndex = data.index;
       zoneWidth = data.width;
     });
 
-    // Draw zone guide (viewer only)
+    // Draw guide (viewer-only)
     function drawZoneGuide(){
       guideCtx.clearRect(0,0,guideCanvas.width, guideCanvas.height);
       const zoneStart = zoneIndex * drawCanvas.width * zoneWidth;
       const zoneEnd = zoneStart + drawCanvas.width * zoneWidth;
 
-      // Semi-transparent fill
+      // Zone fill
       guideCtx.fillStyle = "rgba(255,255,255,0.05)";
       guideCtx.fillRect(zoneStart,0,zoneEnd-zoneStart,drawCanvas.height);
 
-      // Black border
+      // Zone border
       guideCtx.strokeStyle = "black";
       guideCtx.lineWidth = 3;
       guideCtx.strokeRect(zoneStart,0,zoneEnd-zoneStart,drawCanvas.height);
 
-      // Draw "Draw Here" in zone
-      guideCtx.font = "24px Arial";
-      guideCtx.fillStyle = "rgba(0,0,0,0.7)";
-      guideCtx.textAlign = "center";
-      guideCtx.fillText("Draw Here", zoneStart + (zoneEnd-zoneStart)/2, drawCanvas.height/2);
+      // Draw Here text only if user hasn't started drawing
+      if(!drawing && username!=="") {
+        guideCtx.font = "24px Arial";
+        guideCtx.fillStyle = "rgba(0,0,0,0.7)";
+        guideCtx.textAlign = "center";
+        guideCtx.fillText("Draw Here", zoneStart + (zoneEnd-zoneStart)/2, drawCanvas.height/2);
+      }
 
-      // If username not typed yet, show prompt
+      // Prompt username if not typed yet
       if(username===""){
         guideCtx.font="18px Arial";
         guideCtx.fillStyle="rgba(255,0,0,0.8)";
+        guideCtx.textAlign = "center";
         guideCtx.fillText("Type your Twitch name above to draw", drawCanvas.width/2, 50);
       }
     }
-
     setInterval(drawZoneGuide, 100);
 
-    // Drawing events
+    // Drawing functions
     function startDraw(){ drawing=true; }
     function stopDraw(){ drawing=false; prevX=null; prevY=null; }
 
@@ -155,13 +152,13 @@
         // Send to overlay
         socket.emit("draw",{x,y,user:username,color,size:brushSize});
 
-        // Draw locally on viewer canvas
+        // Draw on viewer canvas
         drawCtx.beginPath();
         drawCtx.moveTo(prevX, prevY);
         drawCtx.lineTo(x, y);
-        drawCtx.strokeStyle=color;
-        drawCtx.lineWidth=brushSize;
-        drawCtx.lineCap="round";
+        drawCtx.strokeStyle = color;
+        drawCtx.lineWidth = brushSize;
+        drawCtx.lineCap = "round";
         drawCtx.stroke();
         drawCtx.closePath();
       }

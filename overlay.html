@@ -3,61 +3,27 @@
 <head>
   <title>Overlay</title>
   <style>
-    body, html { margin:0; padding:0; overflow:hidden; }
-    canvas { display:block; }
+    html, body { margin:0; padding:0; overflow:hidden; background:transparent; }
+    canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
   </style>
 </head>
 <body>
-  <canvas id="c"></canvas>
-
+  <canvas id="overlayCanvas"></canvas>
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    const c = document.getElementById("c");
-    const ctx = c.getContext("2d");
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
+    const canvas = document.getElementById("overlayCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-    ctx.lineCap = "round";
-    const maxUsers=10;
-    const usernames = Array(maxUsers).fill(null);
-
-    socket.on("draw",(data)=>{
-      if(!usernames[data.zoneIndex]) usernames[data.zoneIndex]=data.user;
+    socket.on("draw", data=>{
       ctx.beginPath();
-      ctx.moveTo(data.x,data.y);
-      ctx.lineTo(data.x,data.y);
-      ctx.strokeStyle=data.color||"white";
-      ctx.lineWidth=data.size||4;
-      ctx.stroke();
+      ctx.arc(data.x, data.y, data.size/2, 0, Math.PI*2);
+      ctx.fillStyle = data.color;
+      ctx.fill();
       ctx.closePath();
     });
-
-    function drawUsernames(){
-      ctx.font="14px Arial";
-      ctx.textAlign="center";
-      ctx.fillStyle="white";
-      for(let i=0;i<usernames.length;i++){
-        if(usernames[i]){
-          const x=i*(c.width/maxUsers)+(c.width/(2*maxUsers));
-          ctx.fillText(usernames[i],x,20);
-        }
-      }
-    }
-
-    function refreshOverlay(){
-      ctx.clearRect(0,0,c.width,c.height);
-      drawUsernames();
-    }
-
-    socket.on("clear",()=>{
-      usernames.fill(null);
-      refreshOverlay();
-    });
-
-    // auto-clear every 5 minutes
-    setInterval(()=>socket.emit("clear"),300000);
-    setInterval(drawUsernames,500);
   </script>
 </body>
 </html>
