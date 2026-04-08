@@ -17,7 +17,8 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let usersShown = {};
+// Track users and their zone top-left positions
+let userZones = {};
 
 socket.on("draw", data=>{
   // Draw brush
@@ -27,18 +28,20 @@ socket.on("draw", data=>{
   ctx.fill();
   ctx.closePath();
 
-  // Draw username once per user
-  if(data.firstStroke && !usersShown[data.user]){
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "#fff";
-    ctx.fillText(data.user, data.x + 5, data.y - 5);
-    usersShown[data.user] = true;
+  // Store username position by zone
+  if(!userZones[data.user]){
+    userZones[data.user] = {x:data.zoneStartX || data.x - 20, y:20};
   }
+
+  // Draw username persistently at top-left of zone
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(data.user, userZones[data.user].x + 5, userZones[data.user].y);
 });
 
 socket.on("clearCanvas", ()=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  usersShown = {};
+  userZones = {};
 });
 </script>
 </body>
