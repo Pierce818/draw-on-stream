@@ -7,6 +7,7 @@ app.use(express.static(__dirname));
 
 let users = [];
 const maxUsers = 10;
+const bannedWords = ["badword1","badword2","hate"]; // add more
 
 io.on("connection", (socket) => {
   console.log("user connected");
@@ -17,7 +18,14 @@ io.on("connection", (socket) => {
 
   socket.emit("zoneAssigned", { index: zoneIndex, width: zoneWidth });
 
-  socket.on("draw", (data) => io.emit("draw", { ...data, zoneIndex }));
+  socket.on("draw", (data) => {
+    // block drawing if username contains banned word
+    const usernameLower = data.user.toLowerCase();
+    if(bannedWords.some(w=>usernameLower.includes(w))) return;
+
+    io.emit("draw", { ...data, zoneIndex });
+  });
+
   socket.on("disconnect", () => {
     users = users.filter(id => id !== socket.id);
   });

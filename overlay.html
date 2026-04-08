@@ -19,16 +19,11 @@
     c.height = window.innerHeight;
 
     ctx.lineCap = "round";
-    const maxUsers = 10;
-    const zoneHeight = c.height; // full height per zone
-
+    const maxUsers=10;
     const usernames = Array(maxUsers).fill(null);
 
-    socket.on("draw", (data)=>{
-      const zoneStart = data.zoneIndex * (c.width/maxUsers);
-      const zoneEnd = zoneStart + (c.width/maxUsers);
+    socket.on("draw",(data)=>{
       if(!usernames[data.zoneIndex]) usernames[data.zoneIndex]=data.user;
-
       ctx.beginPath();
       ctx.moveTo(data.x,data.y);
       ctx.lineTo(data.x,data.y);
@@ -38,14 +33,13 @@
       ctx.closePath();
     });
 
-    // draw usernames at top of zones
     function drawUsernames(){
       ctx.font="14px Arial";
       ctx.textAlign="center";
       ctx.fillStyle="white";
       for(let i=0;i<usernames.length;i++){
         if(usernames[i]){
-          const x = i*(c.width/maxUsers)+(c.width/(2*maxUsers));
+          const x=i*(c.width/maxUsers)+(c.width/(2*maxUsers));
           ctx.fillText(usernames[i],x,20);
         }
       }
@@ -56,15 +50,13 @@
       drawUsernames();
     }
 
-    socket.on("clear", () => {
+    socket.on("clear",()=>{
       usernames.fill(null);
       refreshOverlay();
     });
 
-    // auto-clear every 5 mins
+    // auto-clear every 5 minutes
     setInterval(()=>socket.emit("clear"),300000);
-
-    // redraw usernames every 500ms to ensure they stay
     setInterval(drawUsernames,500);
   </script>
 </body>
