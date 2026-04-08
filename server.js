@@ -6,17 +6,14 @@ const io = require("socket.io")(http, { cors: { origin: "*" } });
 app.use(express.static(__dirname));
 
 let users = [];
-const maxUsers = 10; // maximum simultaneous zones
+const maxUsers = 10;
 
 io.on("connection", (socket) => {
   console.log("user connected");
 
-  // assign user zone
-  if (!users.includes(socket.id)) {
-    users.push(socket.id);
-  }
+  if (!users.includes(socket.id)) users.push(socket.id);
   const zoneIndex = users.indexOf(socket.id);
-  const zoneWidth = 1 / maxUsers; // fractional width per user
+  const zoneWidth = 1 / maxUsers;
 
   socket.emit("zoneAssigned", { index: zoneIndex, width: zoneWidth });
 

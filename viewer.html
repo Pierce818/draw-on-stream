@@ -1,16 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Viewer Drawing</title>
+  <title>Draw on Stream</title>
+  <style>
+    body, html { margin:0; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
+    canvas { display:block; touch-action:none; }
+    #controls {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.6); padding:10px; border-radius:12px;
+      display:flex; gap:10px; align-items:center; z-index:1000;
+    }
+    #controls input, #controls button { border:none; border-radius:6px; padding:4px 8px; }
+    #controls input[type="text"] { width:120px; }
+    .color-btn { width:24px; height:24px; border:1px solid #fff; cursor:pointer; border-radius:4px; }
+    .color-btn.selected { border: 2px solid #ff0; }
+  </style>
 </head>
 <body>
-  <div>
-    Twitch Name: <input id="nameInput" placeholder="Enter Twitch name" />
-    Color: <input type="color" id="colorPicker" value="#ff0000" />
+  <div id="controls">
+    <input id="nameInput" placeholder="Twitch name" />
+    <div id="colorPalette">
+      <div class="color-btn" style="background:#ff0000;"></div>
+      <div class="color-btn" style="background:#00ff00;"></div>
+      <div class="color-btn" style="background:#0000ff;"></div>
+      <div class="color-btn" style="background:#ffff00;"></div>
+      <div class="color-btn" style="background:#ff00ff;"></div>
+    </div>
     Brush size: <input type="range" id="brushSize" min="1" max="20" value="4" />
   </div>
 
-  <canvas id="c" style="touch-action:none; width:100vw; height:100vh;"></canvas>
+  <canvas id="c"></canvas>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -24,21 +43,25 @@
     let username = "Anon";
     let color = "#ff0000";
     let brushSize = 4;
+    let prevX = null, prevY = null;
 
-    let zoneIndex = 0;
-    let zoneWidth = 1; // default full canvas
-    let prevX = null;
-    let prevY = null;
+    let zoneIndex = 0, zoneWidth = 1;
 
     document.getElementById("nameInput").addEventListener("change", e => {
       username = e.target.value || "Anon";
     });
-    document.getElementById("colorPicker").addEventListener("change", e => {
-      color = e.target.value;
+
+    const paletteBtns = document.querySelectorAll(".color-btn");
+    paletteBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        paletteBtns.forEach(b=>b.classList.remove("selected"));
+        btn.classList.add("selected");
+        color = btn.style.background;
+      });
     });
-    document.getElementById("brushSize").addEventListener("input", e => {
-      brushSize = e.target.value;
-    });
+    paletteBtns[0].classList.add("selected");
+
+    document.getElementById("brushSize").addEventListener("input", e => brushSize = e.target.value);
 
     socket.on("zoneAssigned", data => {
       zoneIndex = data.index;
@@ -46,45 +69,37 @@
     });
 
     c.addEventListener("mousedown", () => drawing = true);
-    c.addEventListener("mouseup", () => { drawing = false; prevX=null; prevY=null; });
+    c.addEventListener("mouseup", () => { drawing=false; prevX=null; prevY=null; });
     c.addEventListener("touchstart", () => drawing = true);
-    c.addEventListener("touchend", () => { drawing = false; prevX=null; prevY=null; });
+    c.addEventListener("touchend", () => { drawing=false; prevX=null; prevY=null; });
 
     c.addEventListener("mousemove", draw);
     c.addEventListener("touchmove", draw);
 
-    function draw(e) {
-      if (!drawing) return;
+    function draw(e){
+      if(!drawing) return;
 
       let x = e.touches ? e.touches[0].clientX : e.clientX;
       let y = e.touches ? e.touches[0].clientY : e.clientY;
 
-      // clamp to zone
       const zoneStart = zoneIndex * c.width * zoneWidth;
       const zoneEnd = zoneStart + c.width * zoneWidth;
       if (x < zoneStart) x = zoneStart;
       if (x > zoneEnd) x = zoneEnd;
 
-      socket.emit("draw", { x, y, user: username, color, size: brushSize });
-
-      if (prevX !== null && prevY !== null) {
+      if(prevX !== null && prevY !== null){
+        socket.emit("draw",{x,y,user:username,color,size:brushSize});
         ctx.beginPath();
-        ctx.moveTo(prevX, prevY);
-        ctx.lineTo(x, y);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = brushSize;
-        ctx.lineCap = "round";
+        ctx.moveTo(prevX,prevY);
+        ctx.lineTo(x,y);
+        ctx.strokeStyle=color;
+        ctx.lineWidth=brushSize;
+        ctx.lineCap="round";
         ctx.stroke();
         ctx.closePath();
-
-        // username
-        ctx.font = "12px Arial";
-        ctx.fillStyle = color;
-        ctx.fillText(username, x + 5, y + 5);
       }
 
-      prevX = x;
-      prevY = y;
+      prevX = x; prevY = y;
     }
   </script>
 </body>

@@ -2,6 +2,10 @@
 <html>
 <head>
   <title>Overlay</title>
+  <style>
+    body, html { margin:0; padding:0; overflow:hidden; }
+    canvas { display:block; }
+  </style>
 </head>
 <body>
   <canvas id="c"></canvas>
@@ -15,28 +19,53 @@
     c.height = window.innerHeight;
 
     ctx.lineCap = "round";
+    const maxUsers = 10;
+    const zoneHeight = c.height; // full height per zone
 
-    socket.on("draw", (data) => {
+    const usernames = Array(maxUsers).fill(null);
+
+    socket.on("draw", (data)=>{
+      const zoneStart = data.zoneIndex * (c.width/maxUsers);
+      const zoneEnd = zoneStart + (c.width/maxUsers);
+      if(!usernames[data.zoneIndex]) usernames[data.zoneIndex]=data.user;
+
       ctx.beginPath();
-      ctx.moveTo(data.x, data.y);
-      ctx.lineTo(data.x, data.y);
-      ctx.strokeStyle = data.color || "white";
-      ctx.lineWidth = data.size || 4;
+      ctx.moveTo(data.x,data.y);
+      ctx.lineTo(data.x,data.y);
+      ctx.strokeStyle=data.color||"white";
+      ctx.lineWidth=data.size||4;
       ctx.stroke();
       ctx.closePath();
-
-      // draw username
-      ctx.font = "12px Arial";
-      ctx.fillStyle = data.color || "white";
-      ctx.fillText(data.user, data.x + 5, data.y + 5);
     });
 
-    socket.on("clear", () => ctx.clearRect(0, 0, c.width, c.height));
+    // draw usernames at top of zones
+    function drawUsernames(){
+      ctx.font="14px Arial";
+      ctx.textAlign="center";
+      ctx.fillStyle="white";
+      for(let i=0;i<usernames.length;i++){
+        if(usernames[i]){
+          const x = i*(c.width/maxUsers)+(c.width/(2*maxUsers));
+          ctx.fillText(usernames[i],x,20);
+        }
+      }
+    }
 
-    // auto-clear every 5 minutes
-    setInterval(() => {
-      socket.emit("clear");
-    }, 300000);
+    function refreshOverlay(){
+      ctx.clearRect(0,0,c.width,c.height);
+      drawUsernames();
+    }
+
+    socket.on("clear", () => {
+      usernames.fill(null);
+      refreshOverlay();
+    });
+
+    // auto-clear every 5 mins
+    setInterval(()=>socket.emit("clear"),300000);
+
+    // redraw usernames every 500ms to ensure they stay
+    setInterval(drawUsernames,500);
   </script>
 </body>
 </html>
