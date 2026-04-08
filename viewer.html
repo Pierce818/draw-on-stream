@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<body>
+<canvas id="c" style="touch-action:none; width:100vw; height:100vh;"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+c.width=window.innerWidth; c.height=window.innerHeight;
+ctx.lineWidth=4; ctx.lineCap="round";
+let drawing=false;
+
+c.addEventListener("mousedown",()=>drawing=true);
+c.addEventListener("mouseup",()=>drawing=false);
+c.addEventListener("touchstart",()=>drawing=true);
+c.addEventListener("touchend",()=>drawing=false);
+
+c.addEventListener("mousemove",draw);
+c.addEventListener("touchmove",draw);
+
+function draw(e){
+ if(!drawing) return;
+ let x=e.touches?e.touches[0].clientX:e.clientX;
+ let y=e.touches?e.touches[0].clientY:e.clientY;
+ socket.emit("draw",{x,y});
+ ctx.lineTo(x,y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x,y);
+}
+</script>
+</body>
+</html>

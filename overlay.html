@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<body>
+<canvas id="c"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+c.width=window.innerWidth; c.height=window.innerHeight;
+ctx.lineWidth=6; ctx.lineCap="round";
+
+socket.on("draw",(data)=>{
+ ctx.lineTo(data.x,data.y);
+ ctx.stroke();
+ ctx.beginPath();
+ ctx.moveTo(data.x,data.y);
+});
+
+socket.on("clear",()=>ctx.clearRect(0,0,c.width,c.height));
+</script>
+</body>
+</html>
