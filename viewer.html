@@ -6,6 +6,9 @@
     html, body { margin:0; padding:0; overflow:hidden; font-family:Arial, sans-serif; }
     canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
 
+    #drawingCanvas { z-index:1; }
+    #guideCanvas { z-index:2; pointer-events:none; } /* guide won't block input */
+
     #controls {
       position: fixed; top:10px; left:50%; transform:translateX(-50%);
       background: rgba(0,0,0,0.6); padding:10px; border-radius:12px;
@@ -23,150 +26,151 @@
 </head>
 <body>
 
-  <div id="controls">
-    <input id="nameInput" placeholder="Type your Twitch name to draw" />
-    <div id="colorPalette">
-      <div class="color-btn" style="background:#FF0000;"></div>
-      <div class="color-btn" style="background:#FF7F00;"></div>
-      <div class="color-btn" style="background:#FFFF00;"></div>
-      <div class="color-btn" style="background:#00FF00;"></div>
-      <div class="color-btn" style="background:#00FFFF;"></div>
-      <div class="color-btn" style="background:#0000FF;"></div>
-      <div class="color-btn" style="background:#8B00FF;"></div>
-      <div class="color-btn" style="background:#FFFFFF;"></div>
-      <div class="color-btn" style="background:#000000;"></div>
-    </div>
-    Brush: <input type="range" id="brushSize" min="1" max="20" value="4" />
+<div id="controls">
+  <input id="nameInput" placeholder="Type your Twitch name to draw" />
+  <div id="colorPalette">
+    <div class="color-btn" style="background:#FF0000;"></div>
+    <div class="color-btn" style="background:#FF7F00;"></div>
+    <div class="color-btn" style="background:#FFFF00;"></div>
+    <div class="color-btn" style="background:#00FF00;"></div>
+    <div class="color-btn" style="background:#00FFFF;"></div>
+    <div class="color-btn" style="background:#0000FF;"></div>
+    <div class="color-btn" style="background:#8B00FF;"></div>
+    <div class="color-btn" style="background:#FFFFFF;"></div>
+    <div class="color-btn" style="background:#000000;"></div>
   </div>
+  Brush: <input type="range" id="brushSize" min="1" max="20" value="4" />
+</div>
 
-  <canvas id="drawingCanvas"></canvas>
-  <canvas id="guideCanvas"></canvas>
+<canvas id="drawingCanvas"></canvas>
+<canvas id="guideCanvas"></canvas>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
 
-    const drawCanvas = document.getElementById("drawingCanvas");
-    const drawCtx = drawCanvas.getContext("2d");
-    drawCanvas.width = window.innerWidth;
-    drawCanvas.height = window.innerHeight;
+const drawCanvas = document.getElementById("drawingCanvas");
+const drawCtx = drawCanvas.getContext("2d");
+drawCanvas.width = window.innerWidth;
+drawCanvas.height = window.innerHeight;
 
-    const guideCanvas = document.getElementById("guideCanvas");
-    const guideCtx = guideCanvas.getContext("2d");
-    guideCanvas.width = window.innerWidth;
-    guideCanvas.height = window.innerHeight;
+const guideCanvas = document.getElementById("guideCanvas");
+const guideCtx = guideCanvas.getContext("2d");
+guideCanvas.width = window.innerWidth;
+guideCanvas.height = window.innerHeight;
 
-    let username = "";
-    let drawing = false;
-    let color = "#FF0000";
-    let brushSize = 4;
-    let prevX = null, prevY = null;
+let username = "";
+let drawing = false;
+let color = "#FF0000";
+let brushSize = 4;
+let prevX = null, prevY = null;
 
-    let zoneIndex = 0, zoneWidth = 1;
-    const maxUsers = 10;
+let zoneIndex = 0, zoneWidth = 1;
 
-    // Username input
-    const nameInput = document.getElementById("nameInput");
-    nameInput.addEventListener("change", e=>{
-      const name = e.target.value.trim();
-      if(name.length>0) username=name;
-    });
+// Username input
+const nameInput = document.getElementById("nameInput");
+nameInput.addEventListener("change", e=>{
+  const name = e.target.value.trim();
+  if(name.length>0) username=name;
+});
 
-    // Color palette
-    const paletteBtns = document.querySelectorAll(".color-btn");
-    paletteBtns.forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        paletteBtns.forEach(b=>b.classList.remove("selected"));
-        btn.classList.add("selected");
-        color = btn.style.background;
-      });
-    });
-    paletteBtns[0].classList.add("selected");
+// Color palette
+const paletteBtns = document.querySelectorAll(".color-btn");
+paletteBtns.forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    paletteBtns.forEach(b=>b.classList.remove("selected"));
+    btn.classList.add("selected");
+    color = btn.style.background;
+  });
+});
+paletteBtns[0].classList.add("selected");
 
-    document.getElementById("brushSize").addEventListener("input", e=>brushSize=e.target.value);
+document.getElementById("brushSize").addEventListener("input", e=>brushSize=e.target.value);
 
-    // Zone assignment from server
-    socket.on("zoneAssigned", data=>{
-      zoneIndex = data.index;
-      zoneWidth = data.width;
-    });
+// Zone assignment from server
+socket.on("zoneAssigned", data=>{
+  zoneIndex = data.index;
+  zoneWidth = data.width;
+});
 
-    // Draw guide (viewer-only)
-    function drawZoneGuide(){
-      guideCtx.clearRect(0,0,guideCanvas.width, guideCanvas.height);
-      const zoneStart = zoneIndex * drawCanvas.width * zoneWidth;
-      const zoneEnd = zoneStart + drawCanvas.width * zoneWidth;
+// Draw guide (viewer-only)
+function drawZoneGuide(){
+  guideCtx.clearRect(0,0,guideCanvas.width, guideCanvas.height);
+  const zoneStart = zoneIndex * drawCanvas.width * zoneWidth;
+  const zoneEnd = zoneStart + drawCanvas.width * zoneWidth;
 
-      // Zone fill
-      guideCtx.fillStyle = "rgba(255,255,255,0.05)";
-      guideCtx.fillRect(zoneStart,0,zoneEnd-zoneStart,drawCanvas.height);
+  // Zone fill
+  guideCtx.fillStyle = "rgba(255,255,255,0.05)";
+  guideCtx.fillRect(zoneStart,0,zoneEnd-zoneStart,drawCanvas.height);
 
-      // Zone border
-      guideCtx.strokeStyle = "black";
-      guideCtx.lineWidth = 3;
-      guideCtx.strokeRect(zoneStart,0,zoneEnd-zoneStart,drawCanvas.height);
+  // Zone border
+  guideCtx.strokeStyle = "black";
+  guideCtx.lineWidth = 3;
+  guideCtx.strokeRect(zoneStart,0,zoneEnd-zoneStart,drawCanvas.height);
 
-      // Draw Here text only if user hasn't started drawing
-      if(!drawing && username!=="") {
-        guideCtx.font = "24px Arial";
-        guideCtx.fillStyle = "rgba(0,0,0,0.7)";
-        guideCtx.textAlign = "center";
-        guideCtx.fillText("Draw Here", zoneStart + (zoneEnd-zoneStart)/2, drawCanvas.height/2);
-      }
+  // Draw Here text if user hasn't started drawing
+  if(!drawing && username!=="") {
+    guideCtx.font = "24px Arial";
+    guideCtx.fillStyle = "rgba(0,0,0,0.7)";
+    guideCtx.textAlign = "center";
+    guideCtx.fillText("Draw Here", zoneStart + (zoneEnd-zoneStart)/2, drawCanvas.height/2);
+  }
 
-      // Prompt username if not typed yet
-      if(username===""){
-        guideCtx.font="18px Arial";
-        guideCtx.fillStyle="rgba(255,0,0,0.8)";
-        guideCtx.textAlign = "center";
-        guideCtx.fillText("Type your Twitch name above to draw", drawCanvas.width/2, 50);
-      }
-    }
-    setInterval(drawZoneGuide, 100);
+  // Prompt username if not typed yet
+  if(username===""){
+    guideCtx.font="18px Arial";
+    guideCtx.fillStyle="rgba(255,0,0,0.8)";
+    guideCtx.textAlign = "center";
+    guideCtx.fillText("Type your Twitch name above to draw", drawCanvas.width/2, 50);
+  }
+}
+setInterval(drawZoneGuide, 100);
 
-    // Drawing functions
-    function startDraw(){ drawing=true; }
-    function stopDraw(){ drawing=false; prevX=null; prevY=null; }
+// Drawing functions
+function startDraw(e){
+  if(username==="") return;
+  drawing=true;
+}
+function stopDraw(){ drawing=false; prevX=null; prevY=null; }
 
-    drawCanvas.addEventListener("mousedown", startDraw);
-    drawCanvas.addEventListener("mouseup", stopDraw);
-    drawCanvas.addEventListener("touchstart", startDraw);
-    drawCanvas.addEventListener("touchend", stopDraw);
+drawCanvas.addEventListener("mousedown", startDraw);
+drawCanvas.addEventListener("mouseup", stopDraw);
+drawCanvas.addEventListener("touchstart", startDraw);
+drawCanvas.addEventListener("touchend", stopDraw);
 
-    drawCanvas.addEventListener("mousemove", draw);
-    drawCanvas.addEventListener("touchmove", draw);
+drawCanvas.addEventListener("mousemove", draw);
+drawCanvas.addEventListener("touchmove", draw);
 
-    function draw(e){
-      if(!drawing || username==="") return;
+function draw(e){
+  if(!drawing || username==="") return;
 
-      let x = e.touches ? e.touches[0].clientX : e.clientX;
-      let y = e.touches ? e.touches[0].clientY : e.clientY;
+  let x = e.touches ? e.touches[0].clientX : e.clientX;
+  let y = e.touches ? e.touches[0].clientY : e.clientY;
 
-      const zoneStart = zoneIndex * drawCanvas.width * zoneWidth;
-      const zoneEnd = zoneStart + drawCanvas.width * zoneWidth;
+  const zoneStart = zoneIndex * drawCanvas.width * zoneWidth;
+  const zoneEnd = zoneStart + drawCanvas.width * zoneWidth;
 
-      if(x < zoneStart) x = zoneStart;
-      if(x > zoneEnd) x = zoneEnd;
+  if(x < zoneStart) x = zoneStart;
+  if(x > zoneEnd) x = zoneEnd;
 
-      if(prevX!==null && prevY!==null){
-        // Send to overlay
-        socket.emit("draw",{x,y,user:username,color,size:brushSize});
+  if(prevX!==null && prevY!==null){
+    // Send to overlay
+    socket.emit("draw",{x,y,user:username,color,size:brushSize});
 
-        // Draw on viewer canvas
-        drawCtx.beginPath();
-        drawCtx.moveTo(prevX, prevY);
-        drawCtx.lineTo(x, y);
-        drawCtx.strokeStyle = color;
-        drawCtx.lineWidth = brushSize;
-        drawCtx.lineCap = "round";
-        drawCtx.stroke();
-        drawCtx.closePath();
-      }
+    // Draw on viewer canvas
+    drawCtx.beginPath();
+    drawCtx.moveTo(prevX, prevY);
+    drawCtx.lineTo(x, y);
+    drawCtx.strokeStyle = color;
+    drawCtx.lineWidth = brushSize;
+    drawCtx.lineCap = "round";
+    drawCtx.stroke();
+    drawCtx.closePath();
+  }
 
-      prevX = x;
-      prevY = y;
-    }
-
-  </script>
+  prevX = x;
+  prevY = y;
+}
+</script>
 </body>
 </html>
