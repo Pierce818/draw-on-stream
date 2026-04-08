@@ -17,31 +17,36 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Track users and their zone top-left positions
-let userZones = {};
+// Track user lines
+let userData = {};
 
 socket.on("draw", data=>{
-  // Draw brush
-  ctx.beginPath();
-  ctx.arc(data.x, data.y, data.size/2, 0, Math.PI*2);
-  ctx.fillStyle = data.color;
-  ctx.fill();
-  ctx.closePath();
+  if(!userData[data.user]){
+    userData[data.user] = {prevX:data.x, prevY:data.y, zoneX:data.zoneStartX, zoneSize:data.zoneSize};
+  } else {
+    // Draw smooth line
+    ctx.beginPath();
+    ctx.moveTo(userData[data.user].prevX, userData[data.user].prevY);
+    ctx.lineTo(data.x, data.y);
+    ctx.strokeStyle = data.color;
+    ctx.lineWidth = data.size;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.closePath();
 
-  // Store username position by zone
-  if(!userZones[data.user]){
-    userZones[data.user] = {x:data.zoneStartX || data.x - 20, y:20};
+    userData[data.user].prevX = data.x;
+    userData[data.user].prevY = data.y;
   }
 
-  // Draw username persistently at top-left of zone
+  // Draw username at top-left of their zone
   ctx.font = "16px Arial";
   ctx.fillStyle = "#fff";
-  ctx.fillText(data.user, userZones[data.user].x + 5, userZones[data.user].y);
+  ctx.fillText(data.user, userData[data.user].zoneX + 5, 20);
 });
 
 socket.on("clearCanvas", ()=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  userZones = {};
+  userData = {};
 });
 </script>
 </body>
