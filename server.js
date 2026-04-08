@@ -5,10 +5,26 @@ const io = require("socket.io")(http, { cors: { origin: "*" } });
 
 app.use(express.static(__dirname));
 
+let users = [];
+const maxUsers = 10; // maximum simultaneous zones
+
 io.on("connection", (socket) => {
   console.log("user connected");
 
-  socket.on("draw", (data) => io.emit("draw", data));
+  // assign user zone
+  if (!users.includes(socket.id)) {
+    users.push(socket.id);
+  }
+  const zoneIndex = users.indexOf(socket.id);
+  const zoneWidth = 1 / maxUsers; // fractional width per user
+
+  socket.emit("zoneAssigned", { index: zoneIndex, width: zoneWidth });
+
+  socket.on("draw", (data) => io.emit("draw", { ...data, zoneIndex }));
+  socket.on("disconnect", () => {
+    users = users.filter(id => id !== socket.id);
+  });
+
   socket.on("clear", () => io.emit("clear"));
 });
 

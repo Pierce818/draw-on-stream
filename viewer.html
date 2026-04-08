@@ -25,6 +25,11 @@
     let color = "#ff0000";
     let brushSize = 4;
 
+    let zoneIndex = 0;
+    let zoneWidth = 1; // default full canvas
+    let prevX = null;
+    let prevY = null;
+
     document.getElementById("nameInput").addEventListener("change", e => {
       username = e.target.value || "Anon";
     });
@@ -35,10 +40,15 @@
       brushSize = e.target.value;
     });
 
+    socket.on("zoneAssigned", data => {
+      zoneIndex = data.index;
+      zoneWidth = data.width;
+    });
+
     c.addEventListener("mousedown", () => drawing = true);
-    c.addEventListener("mouseup", () => drawing = false);
+    c.addEventListener("mouseup", () => { drawing = false; prevX=null; prevY=null; });
     c.addEventListener("touchstart", () => drawing = true);
-    c.addEventListener("touchend", () => drawing = false);
+    c.addEventListener("touchend", () => { drawing = false; prevX=null; prevY=null; });
 
     c.addEventListener("mousemove", draw);
     c.addEventListener("touchmove", draw);
@@ -46,19 +56,35 @@
     function draw(e) {
       if (!drawing) return;
 
-      const x = e.touches ? e.touches[0].clientX : e.clientX;
-      const y = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = e.touches ? e.touches[0].clientX : e.clientX;
+      let y = e.touches ? e.touches[0].clientY : e.clientY;
+
+      // clamp to zone
+      const zoneStart = zoneIndex * c.width * zoneWidth;
+      const zoneEnd = zoneStart + c.width * zoneWidth;
+      if (x < zoneStart) x = zoneStart;
+      if (x > zoneEnd) x = zoneEnd;
 
       socket.emit("draw", { x, y, user: username, color, size: brushSize });
 
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x, y);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = "round";
-      ctx.stroke();
-      ctx.closePath();
+      if (prevX !== null && prevY !== null) {
+        ctx.beginPath();
+        ctx.moveTo(prevX, prevY);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = "round";
+        ctx.stroke();
+        ctx.closePath();
+
+        // username
+        ctx.font = "12px Arial";
+        ctx.fillStyle = color;
+        ctx.fillText(username, x + 5, y + 5);
+      }
+
+      prevX = x;
+      prevY = y;
     }
   </script>
 </body>

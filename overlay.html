@@ -4,7 +4,6 @@
   <title>Overlay</title>
 </head>
 <body>
-  <button onclick="socket.emit('clear')">Clear Canvas</button>
   <canvas id="c"></canvas>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -26,13 +25,18 @@
       ctx.stroke();
       ctx.closePath();
 
-      // Draw username
+      // draw username
       ctx.font = "12px Arial";
       ctx.fillStyle = data.color || "white";
       ctx.fillText(data.user, data.x + 5, data.y + 5);
     });
 
     socket.on("clear", () => ctx.clearRect(0, 0, c.width, c.height));
+
+    // auto-clear every 5 minutes
+    setInterval(() => {
+      socket.emit("clear");
+    }, 300000);
   </script>
 </body>
 </html>
