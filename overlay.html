@@ -1,23 +1,38 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <title>Overlay</title>
+</head>
 <body>
-<canvas id="c"></canvas>
-<script src="/socket.io/socket.io.js"></script>
-<script>
-const socket = io();
-const c=document.getElementById("c");
-const ctx=c.getContext("2d");
-c.width=window.innerWidth; c.height=window.innerHeight;
-ctx.lineWidth=6; ctx.lineCap="round";
+  <button onclick="socket.emit('clear')">Clear Canvas</button>
+  <canvas id="c"></canvas>
 
-socket.on("draw",(data)=>{
- ctx.lineTo(data.x,data.y);
- ctx.stroke();
- ctx.beginPath();
- ctx.moveTo(data.x,data.y);
-});
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const c = document.getElementById("c");
+    const ctx = c.getContext("2d");
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
 
-socket.on("clear",()=>ctx.clearRect(0,0,c.width,c.height));
-</script>
+    ctx.lineCap = "round";
+
+    socket.on("draw", (data) => {
+      ctx.beginPath();
+      ctx.moveTo(data.x, data.y);
+      ctx.lineTo(data.x, data.y);
+      ctx.strokeStyle = data.color || "white";
+      ctx.lineWidth = data.size || 4;
+      ctx.stroke();
+      ctx.closePath();
+
+      // Draw username
+      ctx.font = "12px Arial";
+      ctx.fillStyle = data.color || "white";
+      ctx.fillText(data.user, data.x + 5, data.y + 5);
+    });
+
+    socket.on("clear", () => ctx.clearRect(0, 0, c.width, c.height));
+  </script>
 </body>
 </html>

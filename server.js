@@ -7,6 +7,7 @@ app.use(express.static(__dirname));
 
 io.on("connection", (socket) => {
   console.log("user connected");
+
   socket.on("draw", (data) => io.emit("draw", data));
   socket.on("clear", () => io.emit("clear"));
 });
