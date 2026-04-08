@@ -5,34 +5,35 @@ const io = require("socket.io")(http);
 
 app.use(express.static(__dirname));
 
-let connectedUsers = [];
+let userZones = {};
 let votes = {};
 const zoneCount = 10;
 
 io.on("connection", socket=>{
   console.log("User connected");
 
-  const index = connectedUsers.length % zoneCount;
-  connectedUsers.push(socket.id);
-  socket.emit("zoneAssigned",{index,width:1/zoneCount});
+  // Assign unique zone
+  const usedZones = Object.values(userZones);
+  let index = 0;
+  while(usedZones.includes(index) && index < zoneCount) index++;
+  userZones[socket.id] = index;
 
-  // Broadcast drawing
-  socket.on("draw", data=>io.emit("draw", data));
+  socket.emit("zoneAssigned",{index, width:1/zoneCount});
 
-  // Vote to clear
+  socket.on("draw", data=> io.emit("draw", data));
+
   socket.on("voteClear", user=>{
     votes[socket.id] = true;
     const voteCount = Object.keys(votes).length;
-    const majority = Math.ceil(connectedUsers.length/2);
-
+    const majority = Math.ceil(Object.keys(userZones).length / 2);
     if(voteCount >= majority){
       io.emit("clearCanvas");
-      votes = {}; // reset
+      votes = {};
     }
   });
 
   socket.on("disconnect", ()=>{
-    connectedUsers = connectedUsers.filter(id => id!==socket.id);
+    delete userZones[socket.id];
     delete votes[socket.id];
   });
 });
