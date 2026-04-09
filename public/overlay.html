@@ -2,80 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Draw Overlay</title>
+<title>Overlay</title>
 <style>
 html, body { margin:0; padding:0; overflow:hidden; background:transparent; }
 canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
 </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
+<canvas id="overlayCanvas"></canvas>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const overlay = document.getElementById("overlayCanvas");
+const ctx = overlay.getContext("2d");
+overlay.width = window.innerWidth;
+overlay.height = window.innerHeight;
 
-// Keep track of each user
-const users = {};
+let userStrokes = {}; // track last positions per user
 
 socket.on("draw", data=>{
-  const zoneWidth = Math.min(canvas.width * 0.225, canvas.height*0.5);
-  const zoneStartX = data.zoneIndex * canvas.width * 0.225;
-  const zoneSize = Math.min(canvas.width * 0.225, canvas.height*0.5);
-  const x = zoneStartX + data.normX * zoneSize;
-  const y = data.normY * zoneSize;
+  const {user,color,size,normX,normY,zoneIndex} = data;
 
-  if(users[data.user]?.drawing && users[data.user].lastStroke){
-    const last = users[data.user].lastStroke;
+  const zoneStartX = zoneIndex * overlay.width * 0.225;
+  const zoneSize = Math.min(overlay.width*0.225, overlay.height*0.5);
+
+  const x = zoneStartX + normX*zoneSize;
+  const y = normY*zoneSize;
+
+  if(!userStrokes[user]) userStrokes[user]={prevX:null, prevY:null};
+
+  if(userStrokes[user].prevX!==null && userStrokes[user].prevY!==null){
     ctx.beginPath();
-    ctx.moveTo(last.x,last.y);
-    ctx.lineTo(x,y);
-    ctx.strokeStyle=data.color;
-    ctx.lineWidth=data.size;
+    ctx.moveTo(userStrokes[user].prevX, userStrokes[user].prevY);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle=color;
+    ctx.lineWidth=size;
     ctx.lineCap="round";
     ctx.stroke();
     ctx.closePath();
   }
 
-  users[data.user] = {
-    ...users[data.user],
-    lastStroke: {x,y},
-    drawing:true,
-    username:data.user,
-    zoneIndex:data.zoneIndex,
-    color:data.color
-  };
-
-  // Draw username above zone
-  ctx.font = "16px Arial";
-  ctx.fillStyle = data.color;
-  ctx.textAlign = "center";
-  ctx.fillText(data.user, zoneStartX + zoneSize/2, zoneSize + 18);
+  userStrokes[user].prevX = x;
+  userStrokes[user].prevY = y;
 });
 
-// NEW: startDraw resets lastStroke
-socket.on("startDraw", username=>{
-  if(users[username]){
-    users[username].lastStroke = null;
-    users[username].drawing = true;
-  }
-});
-
-// stopDraw resets drawing
-socket.on("stopDraw", username=>{
-  if(users[username]){
-    users[username].drawing=false;
-    users[username].lastStroke=null;
-  }
-});
-
-// Clear canvas
 socket.on("clearCanvas", ()=>{
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  for(const u in users) delete users[u];
+  ctx.clearRect(0,0,overlay.width, overlay.height);
+  userStrokes={};
 });
 </script>
 </body>

@@ -28,9 +28,7 @@ canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action
 #voteClear { background:#ff4d4d; color:#fff; cursor:pointer; }
 #voteClear:disabled { background:#999; cursor:not-allowed; }
 
-#minimizeBtn {
-  background:#888; color:#fff; cursor:pointer; padding:6px 10px; border-radius:8px;
-}
+#minimizeBtn { background:#888; color:#fff; cursor:pointer; padding:6px 10px; border-radius:8px; }
 </style>
 </head>
 <body>
@@ -107,15 +105,10 @@ const minimizeBtn = document.getElementById("minimizeBtn");
 let minimized = false;
 minimizeBtn.addEventListener("click", ()=>{
   minimized = !minimized;
-  if(minimized){
-    Array.from(controlsDiv.children).forEach(c=>{
-      if(c!==minimizeBtn) c.style.display="none";
-    });
-    minimizeBtn.textContent = "+";
-  } else {
-    Array.from(controlsDiv.children).forEach(c=> c.style.display="flex");
-    minimizeBtn.textContent = "−";
-  }
+  Array.from(controlsDiv.children).forEach(c=>{
+    if(c!==minimizeBtn) c.style.display=minimized ? "none":"flex";
+  });
+  minimizeBtn.textContent = minimized ? "+" : "−";
 });
 
 // --- Assigned zone
@@ -157,14 +150,14 @@ function startDraw(e){
   if(username==="") return;
   drawing=true;
   drawStarted=true;
-  prevX=null; prevY=null;
-  socket.emit("startDraw", username); // NEW: overlay resets lastStroke
+  prevX=null; // reset previous stroke coordinates here
+  prevY=null;
 }
+
 function stopDraw(){
   drawing=false;
   prevX=null;
   prevY=null;
-  socket.emit("stopDraw", username);
 }
 
 drawCanvas.addEventListener("mousedown", startDraw);
@@ -186,10 +179,10 @@ function draw(e){
   x = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
   y = Math.max(0, Math.min(y, zoneSize));
 
-  const normX = (x - zoneStartX)/zoneSize;
-  const normY = y/zoneSize;
-
   if(prevX!==null && prevY!==null){
+    // send normalized coordinates to server
+    const normX = (x - zoneStartX)/zoneSize;
+    const normY = y/zoneSize;
     socket.emit("draw", { user:username, color, size:brushSize, normX, normY, zoneIndex });
 
     drawCtx.beginPath();
@@ -205,6 +198,8 @@ function draw(e){
   prevX = x;
   prevY = y;
 }
+
+// --- Clear canvas
 socket.on("clearCanvas", ()=>{
   drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   drawStarted=false;
