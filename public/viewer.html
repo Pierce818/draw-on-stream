@@ -24,17 +24,14 @@ const ctx = canvas.getContext("2d");
 const usernameInput = document.getElementById("usernameInput");
 const colorPicker = document.getElementById("colorPicker");
 
-let drawing=false, prevX=null, prevY=null, drawStarted=false;
+let drawing=false, prevX=null, prevY=null;
 let username="";
-
-// Assign each user a zone index
-let zoneIndex=0; // could be dynamic for multiple users
+let zoneIndex=0; // assigned zone for user
 
 canvas.addEventListener("pointerdown", e=>{
   username = usernameInput.value.trim();
   if(!username) return alert("Enter your username first!");
   drawing=true;
-  drawStarted=true;
   const rect=canvas.getBoundingClientRect();
   prevX=(e.clientX-rect.left)/Math.min(canvas.width * 0.225, canvas.height * 0.5);
   prevY=(e.clientY-rect.top)/Math.min(canvas.width * 0.225, canvas.height * 0.5);
@@ -52,13 +49,9 @@ canvas.addEventListener("pointermove", e=>{
 });
 
 function stopDraw(){
-  if(username){
-    drawing=false;
-    prevX=null;
-    prevY=null;
-    drawStarted=false;
-    socket.emit("stopDraw", username);
-  }
+  drawing=false;
+  prevX=null;
+  prevY=null;
 }
 
 canvas.addEventListener("pointerup", stopDraw);
