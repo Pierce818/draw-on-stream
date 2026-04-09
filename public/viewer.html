@@ -2,62 +2,206 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Draw Viewer</title>
+<title>Draw on Stream</title>
 <style>
-html, body { margin:0; padding:0; }
-#drawCanvas { border:1px solid #ccc; touch-action: none; }
-#ui { position:fixed; top:10px; left:10px; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);}
+html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f0f0; }
+canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
+#drawingCanvas { z-index:1; }
+#guideCanvas { z-index:2; pointer-events:none; }
+
+#controls {
+  position: fixed; top:12px; left:50%; transform: translateX(-50%);
+  background: rgba(40,40,40,0.9); padding: 14px 20px; border-radius:16px;
+  display:flex; gap:12px; flex-wrap: wrap; align-items:center;
+  z-index:9999; color:#fff; font-size:14px; box-shadow:0 5px 18px rgba(0,0,0,0.35);
+  transition: all 0.3s ease;
+}
+#controls input, #controls button { border:none; border-radius:8px; padding:6px 10px; font-size:14px; }
+#controls input { width:160px; position:relative; z-index:10000; }
+
+#colorPicker { display:grid; grid-template-columns: repeat(5, 28px); grid-gap:5px; }
+.color-btn { width:28px; height:28px; border-radius:6px; cursor:pointer; border:1px solid #fff; transition: all 0.2s; }
+.color-btn:hover { transform: scale(1.2); border-width:2px; }
+.color-btn.selected { border:2px solid #ff0; }
+
+#brushSize { width:100px; }
+#voteClear { background:#ff4d4d; color:#fff; cursor:pointer; }
+#voteClear:disabled { background:#999; cursor:not-allowed; }
+
+#minimizeBtn {
+  background:#888; color:#fff; cursor:pointer; padding:6px 10px; border-radius:8px;
+}
 </style>
 </head>
 <body>
-<div id="ui">
-  <input type="text" id="usernameInput" placeholder="Enter your name">
-  <input type="color" id="colorPicker" value="#ff0000">
+
+<div id="controls">
+  <button id="minimizeBtn">−</button>
+  <input id="nameInput" placeholder="Enter Twitch name" />
+  <div id="colorPicker"></div>
+  Brush: <input type="range" id="brushSize" min="1" max="20" value="4" />
+  <button id="voteClear">Vote to Clear</button>
 </div>
-<canvas id="drawCanvas" width="800" height="600"></canvas>
+
+<canvas id="drawingCanvas"></canvas>
+<canvas id="guideCanvas"></canvas>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const canvas = document.getElementById("drawCanvas");
-const ctx = canvas.getContext("2d");
-const usernameInput = document.getElementById("usernameInput");
+const drawCanvas = document.getElementById("drawingCanvas");
+const drawCtx = drawCanvas.getContext("2d");
+drawCanvas.width = window.innerWidth;
+drawCanvas.height = window.innerHeight;
+
+const guideCanvas = document.getElementById("guideCanvas");
+const guideCtx = guideCanvas.getContext("2d");
+guideCanvas.width = window.innerWidth;
+guideCanvas.height = window.innerHeight;
+
+let username = "";
+let drawing = false;
+let drawStarted = false;
+let color = "#FF0000";
+let brushSize = 4;
+let prevX = null, prevY = null;
+let zoneIndex = 0;
+let zoneWidth = 0.225;
+
+// --- Username input
+const nameInput = document.getElementById("nameInput");
+nameInput.addEventListener("change", e=>{
+  const name = e.target.value.trim();
+  if(name.length>0) username = name;
+});
+
+// --- Photoshop-style color picker
+const colors = ["#FF0000","#FF7F00","#FFFF00","#00FF00","#00FFFF","#0000FF","#8B00FF","#FFFFFF","#000000","#C0C0C0"];
 const colorPicker = document.getElementById("colorPicker");
 
-let drawing=false, prevX=null, prevY=null;
-let username="";
-let zoneIndex=0; // assigned zone for user
+colors.forEach(c=>{
+  const btn = document.createElement("div");
+  btn.classList.add("color-btn");
+  btn.style.background=c;
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".color-btn").forEach(b=>b.classList.remove("selected"));
+    btn.classList.add("selected");
+    color = c;
+  });
+  colorPicker.appendChild(btn);
+});
+colorPicker.firstChild.classList.add("selected");
 
-canvas.addEventListener("pointerdown", e=>{
-  username = usernameInput.value.trim();
-  if(!username) return alert("Enter your username first!");
-  drawing=true;
-  const rect=canvas.getBoundingClientRect();
-  prevX=(e.clientX-rect.left)/Math.min(canvas.width * 0.225, canvas.height * 0.5);
-  prevY=(e.clientY-rect.top)/Math.min(canvas.width * 0.225, canvas.height * 0.5);
+// --- Brush size
+document.getElementById("brushSize").addEventListener("input", e=>brushSize=e.target.value);
+
+// --- Vote to clear
+const voteClearBtn = document.getElementById("voteClear");
+voteClearBtn.addEventListener("click", ()=>{
+  socket.emit("voteClear", username);
+  voteClearBtn.disabled = true;
 });
 
-canvas.addEventListener("pointermove", e=>{
-  if(!drawing || !username) return;
-  const rect=canvas.getBoundingClientRect();
-  const normX=(e.clientX-rect.left)/Math.min(canvas.width * 0.225, canvas.height * 0.5);
-  const normY=(e.clientY-rect.top)/Math.min(canvas.width * 0.225, canvas.height * 0.5);
-  
-  socket.emit("draw", {user:username, normX, normY, color: colorPicker.value, size:4, zoneIndex});
-  prevX=normX;
-  prevY=normY;
+// --- Minimize/Expand UI
+const controlsDiv = document.getElementById("controls");
+const minimizeBtn = document.getElementById("minimizeBtn");
+let minimized = false;
+minimizeBtn.addEventListener("click", ()=>{
+  minimized = !minimized;
+  if(minimized){
+    Array.from(controlsDiv.children).forEach(c=>{
+      if(c!==minimizeBtn) c.style.display="none";
+    });
+    minimizeBtn.textContent = "+";
+  } else {
+    Array.from(controlsDiv.children).forEach(c=>{
+      c.style.display="flex";
+    });
+    minimizeBtn.textContent = "−";
+  }
 });
 
-function stopDraw(){
-  drawing=false;
-  prevX=null;
-  prevY=null;
+// --- Assigned zone
+socket.on("zoneAssigned", data=>{
+  zoneIndex = data.index;
+  zoneWidth = data.width;
+});
+
+// --- Draw guide
+function drawZoneGuide(){
+  guideCtx.clearRect(0,0,guideCanvas.width, guideCanvas.height);
+  const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
+  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height*0.5);
+
+  guideCtx.fillStyle = "rgba(255,255,255,0.05)";
+  guideCtx.fillRect(zoneStartX,0,zoneSize,zoneSize);
+  guideCtx.strokeStyle = "black";
+  guideCtx.lineWidth = 3;
+  guideCtx.strokeRect(zoneStartX,0,zoneSize,zoneSize);
+
+  if(!drawStarted && username!==""){
+    guideCtx.font = "22px Arial";
+    guideCtx.fillStyle = "rgba(0,0,0,0.7)";
+    guideCtx.textAlign = "center";
+    guideCtx.fillText("Draw Here", zoneStartX + zoneSize/2, zoneSize/2);
+  }
+
+  if(username===""){
+    guideCtx.font="18px Arial";
+    guideCtx.fillStyle="rgba(255,0,0,0.8)";
+    guideCtx.textAlign="center";
+    guideCtx.fillText("Enter your Twitch name above to draw", drawCanvas.width/2, 50);
+  }
+}
+setInterval(drawZoneGuide, 100);
+
+// --- Drawing
+function startDraw(e){ if(username==="") return; drawing=true; drawStarted=true; }
+function stopDraw(){ drawing=false; prevX=null; prevY=null; }
+
+drawCanvas.addEventListener("mousedown", startDraw);
+drawCanvas.addEventListener("mouseup", stopDraw);
+drawCanvas.addEventListener("touchstart", startDraw);
+drawCanvas.addEventListener("touchend", stopDraw);
+drawCanvas.addEventListener("mousemove", draw);
+drawCanvas.addEventListener("touchmove", draw);
+
+function draw(e){
+  if(!drawing || username==="") return;
+
+  let x = e.touches ? e.touches[0].clientX : e.clientX;
+  let y = e.touches ? e.touches[0].clientY : e.clientY;
+
+  const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
+  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height*0.5);
+
+  x = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
+  y = Math.max(0, Math.min(y, zoneSize));
+
+  const normX = (x - zoneStartX)/zoneSize;
+  const normY = y/zoneSize;
+
+  if(prevX!==null && prevY!==null){
+    socket.emit("draw", { user:username, color, size:brushSize, normX, normY, zoneIndex });
+
+    drawCtx.beginPath();
+    drawCtx.moveTo(prevX, prevY);
+    drawCtx.lineTo(x, y);
+    drawCtx.strokeStyle=color;
+    drawCtx.lineWidth=brushSize;
+    drawCtx.lineCap="round";
+    drawCtx.stroke();
+    drawCtx.closePath();
+  }
+
+  prevX = x;
+  prevY = y;
 }
 
-canvas.addEventListener("pointerup", stopDraw);
-canvas.addEventListener("pointerleave", stopDraw);
-canvas.addEventListener("touchend", stopDraw);
-
+socket.on("clearCanvas", ()=>{
+  drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  drawStarted=false;
+});
 </script>
 </body>
 </html>
