@@ -2,57 +2,78 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Draw on Stream - Overlay</title>
+<title>Draw Overlay</title>
 <style>
-html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:transparent; }
+html, body { margin:0; padding:0; overflow:hidden; }
 canvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
-#drawingCanvas { z-index:1; }
-.username { position:absolute; z-index:2; pointer-events:none; font-family:'Segoe UI', sans-serif; color:#000; font-weight:bold; }
+.username {
+  position:absolute; font-family:Arial; font-size:16px; color:white; text-shadow:0 0 4px black;
+}
 </style>
 </head>
 <body>
-<canvas id="drawingCanvas"></canvas>
-
+<canvas id="overlayCanvas"></canvas>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const drawCanvas = document.getElementById("drawingCanvas");
-const drawCtx = drawCanvas.getContext("2d");
-drawCanvas.width = window.innerWidth;
-drawCanvas.height = window.innerHeight;
+const canvas = document.getElementById("overlayCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-let users = {}; // { username: zoneIndex }
+// Track users
+let users = {}; // user -> { zoneIndex, color, lastX, lastY }
 
-socket.on("draw", data => {
-  drawCtx.beginPath();
-  drawCtx.moveTo(data.prevX, data.prevY);
-  drawCtx.lineTo(data.x, data.y);
-  drawCtx.strokeStyle = data.color;
-  drawCtx.lineWidth = data.size;
-  drawCtx.lineCap = "round";
-  drawCtx.stroke();
-  drawCtx.closePath();
+socket.on("draw", data=>{
+  const { user, color, size, normX, normY, zoneIndex } = data;
+  const zoneSize = Math.min(canvas.width * 0.225, canvas.height*0.5);
+  const zoneStartX = zoneIndex * canvas.width * 0.225;
+
+  const x = zoneStartX + normX * zoneSize;
+  const y = normY * zoneSize;
+
+  if(!users[user]) users[user]={ lastX:null, lastY:null, zoneIndex, color };
+  const u = users[user];
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = "round";
+
+  if(u.lastX!==null && u.lastY!==null){
+    ctx.beginPath();
+    ctx.moveTo(u.lastX, u.lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.closePath();
+  }
+  u.lastX = x;
+  u.lastY = y;
 });
 
-socket.on("userUpdate", data => {
-  users[data.user] = data.zoneIndex;
-
-  document.querySelectorAll(".username").forEach(el => el.remove());
-
-  Object.keys(users).forEach(u => {
-    const label = document.createElement("div");
-    label.className = "username";
-    label.style.left = (users[u] * drawCanvas.width * 0.225 + 10) + "px";
-    label.style.top = "10px";
-    label.textContent = u;
-    document.body.appendChild(label);
+// Clear
+socket.on("clearCanvas", ()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  Object.keys(users).forEach(u=>{
+    users[u].lastX = null;
+    users[u].lastY = null;
   });
 });
 
-socket.on("clearCanvas", ()=>{
-  drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  document.querySelectorAll(".username").forEach(el => el.remove());
-  users = {};
+// Username labels
+socket.on("userUpdate", data=>{
+  const { user, zoneIndex } = data;
+  users[user] = users[user] || { lastX:null, lastY:null, zoneIndex };
+  // Remove old labels
+  document.querySelectorAll(".username").forEach(el=>el.remove());
+
+  const label = document.createElement("div");
+  label.className="username";
+  const zoneSize = Math.min(canvas.width * 0.225, canvas.height*0.5);
+  const zoneStartX = zoneIndex * canvas.width * 0.225;
+  label.style.left = (zoneStartX + 10) + "px";
+  label.style.top = "10px";
+  label.textContent = user;
+  document.body.appendChild(label);
 });
 </script>
 </body>
