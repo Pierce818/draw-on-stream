@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <title>Draw Overlay</title>
 <style>
-  html, body { margin:0; padding:0; overflow:hidden; background:transparent; }
-  canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
+html, body { margin:0; padding:0; overflow:hidden; background:transparent; }
+canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
 </style>
 </head>
 <body>
@@ -18,18 +18,18 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Track last positions per user
-const prev = {};
+// Users object stores last position and username per user
+const users = {};
 
 socket.on("draw", data => {
-  const zoneWidth = 0.225;
-  const zoneSize = Math.min(canvas.width * zoneWidth, canvas.height * 0.5);
-  const zoneStartX = data.zoneIndex * canvas.width * zoneWidth;
+  const zoneWidth = Math.min(canvas.width * 0.225, canvas.height * 0.5); // same as viewer
+  const zoneStartX = data.zoneIndex * canvas.width * 0.225;
 
-  const x = zoneStartX + data.normX * zoneSize;
-  const y = data.normY * zoneSize;
+  const x = zoneStartX + data.normX * zoneWidth;
+  const y = data.normY * zoneWidth;
 
-  const last = prev[data.user] || {x, y};
+  const last = users[data.user]?.last || {x, y};
+
   ctx.beginPath();
   ctx.moveTo(last.x, last.y);
   ctx.lineTo(x, y);
@@ -39,12 +39,18 @@ socket.on("draw", data => {
   ctx.stroke();
   ctx.closePath();
 
-  prev[data.user] = { x, y };
+  // Draw username above zone
+  ctx.font = "16px Arial";
+  ctx.fillStyle = data.color;
+  ctx.textAlign = "center";
+  ctx.fillText(data.user, zoneStartX + zoneWidth/2, zoneWidth + 18);
+
+  users[data.user] = { last:{x,y}, username: data.user };
 });
 
 socket.on("clearCanvas", ()=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  for(const k in prev) delete prev[k];
+  for(const u in users) delete users[u];
 });
 </script>
 </body>

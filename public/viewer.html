@@ -4,33 +4,39 @@
 <meta charset="UTF-8">
 <title>Draw on Stream</title>
 <style>
-  html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f0f0; }
-  canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
-  #drawingCanvas { z-index:1; }
-  #guideCanvas { z-index:2; pointer-events:none; }
+html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f0f0; }
+canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
+#drawingCanvas { z-index:1; }
+#guideCanvas { z-index:2; pointer-events:none; }
 
-  #controls {
-    position: fixed; top:12px; left:50%; transform: translateX(-50%);
-    background: rgba(40,40,40,0.9); padding: 14px 20px; border-radius:16px;
-    display:flex; gap:12px; flex-wrap: wrap; align-items:center;
-    z-index:9999; color:#fff; font-size:14px; box-shadow:0 5px 18px rgba(0,0,0,0.35);
-  }
-  #controls input, #controls button { border:none; border-radius:8px; padding:6px 10px; font-size:14px; }
-  #controls input { width:160px; position:relative; z-index:10000; }
+#controls {
+  position: fixed; top:12px; left:50%; transform: translateX(-50%);
+  background: rgba(40,40,40,0.9); padding: 14px 20px; border-radius:16px;
+  display:flex; gap:12px; flex-wrap: wrap; align-items:center;
+  z-index:9999; color:#fff; font-size:14px; box-shadow:0 5px 18px rgba(0,0,0,0.35);
+  transition: all 0.3s ease;
+}
+#controls input, #controls button { border:none; border-radius:8px; padding:6px 10px; font-size:14px; }
+#controls input { width:160px; position:relative; z-index:10000; }
 
-  #colorPicker { display:grid; grid-template-columns: repeat(5, 28px); grid-gap:5px; }
-  .color-btn { width:28px; height:28px; border-radius:6px; cursor:pointer; border:1px solid #fff; transition: all 0.2s; }
-  .color-btn:hover { transform: scale(1.2); border-width:2px; }
-  .color-btn.selected { border:2px solid #ff0; }
+#colorPicker { display:grid; grid-template-columns: repeat(5, 28px); grid-gap:5px; }
+.color-btn { width:28px; height:28px; border-radius:6px; cursor:pointer; border:1px solid #fff; transition: all 0.2s; }
+.color-btn:hover { transform: scale(1.2); border-width:2px; }
+.color-btn.selected { border:2px solid #ff0; }
 
-  #brushSize { width:100px; }
-  #voteClear { background:#ff4d4d; color:#fff; cursor:pointer; }
-  #voteClear:disabled { background:#999; cursor:not-allowed; }
+#brushSize { width:100px; }
+#voteClear { background:#ff4d4d; color:#fff; cursor:pointer; }
+#voteClear:disabled { background:#999; cursor:not-allowed; }
+
+#minimizeBtn {
+  background:#888; color:#fff; cursor:pointer; padding:6px 10px; border-radius:8px;
+}
 </style>
 </head>
 <body>
 
 <div id="controls">
+  <button id="minimizeBtn">−</button>
   <input id="nameInput" placeholder="Enter Twitch name" />
   <div id="colorPicker"></div>
   Brush: <input type="range" id="brushSize" min="1" max="20" value="4" />
@@ -94,6 +100,25 @@ const voteClearBtn = document.getElementById("voteClear");
 voteClearBtn.addEventListener("click", ()=>{
   socket.emit("voteClear", username);
   voteClearBtn.disabled = true;
+});
+
+// --- Minimize/Expand UI
+const controlsDiv = document.getElementById("controls");
+const minimizeBtn = document.getElementById("minimizeBtn");
+let minimized = false;
+minimizeBtn.addEventListener("click", ()=>{
+  minimized = !minimized;
+  if(minimized){
+    Array.from(controlsDiv.children).forEach(c=>{
+      if(c!==minimizeBtn) c.style.display="none";
+    });
+    minimizeBtn.textContent = "+";
+  } else {
+    Array.from(controlsDiv.children).forEach(c=>{
+      c.style.display="flex";
+    });
+    minimizeBtn.textContent = "−";
+  }
 });
 
 // --- Assigned zone
