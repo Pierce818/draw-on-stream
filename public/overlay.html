@@ -2,12 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Draw on Stream - Overlay</title>
+<title>Draw on Stream – Overlay</title>
 <style>
-html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:transparent; }
-canvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
-#drawingCanvas { z-index:1; }
-.username { position:absolute; z-index:2; pointer-events:none; font-family:'Segoe UI', sans-serif; color:#000; font-weight:bold; }
+html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
+canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+#drawingCanvas { z-index: 1; }
+
+.username-label {
+  position: absolute; z-index: 2; pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px; font-weight: 800;
+  padding: 3px 10px 4px; border-radius: 6px;
+  white-space: nowrap; letter-spacing: 0.3px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  transition: opacity 0.3s;
+}
 </style>
 </head>
 <body>
@@ -16,43 +26,86 @@ canvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-even
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
+socket.emit("setType", "overlay");
+
 const drawCanvas = document.getElementById("drawingCanvas");
-const drawCtx = drawCanvas.getContext("2d");
-drawCanvas.width = window.innerWidth;
+const drawCtx    = drawCanvas.getContext("2d");
+drawCanvas.width  = window.innerWidth;
 drawCanvas.height = window.innerHeight;
 
-let users = {}; // { username: zoneIndex }
+const zoneWidth = 0.225;
+let users = {}; // { name: { zoneIndex, color, labelEl } }
 
-socket.on("draw", data => {
-  drawCtx.beginPath();
-  drawCtx.moveTo(data.prevX, data.prevY);
-  drawCtx.lineTo(data.x, data.y);
-  drawCtx.strokeStyle = data.color;
-  drawCtx.lineWidth = data.size;
-  drawCtx.lineCap = "round";
-  drawCtx.stroke();
-  drawCtx.closePath();
+function ensureLabel(name, color) {
+  if (!users[name]) return;
+  if (users[name].labelEl) return;
+  const el = document.createElement("div");
+  el.className = "username-label";
+  el.textContent = name;
+  el.style.background = color + "cc";
+  el.style.borderBottom = `2px solid ${color}`;
+  document.body.appendChild(el);
+  users[name].labelEl = el;
+}
+
+function updateLabels() {
+  Object.entries(users).forEach(([name, info]) => {
+    ensureLabel(name, info.color);
+    const label = info.labelEl;
+    if (!label) return;
+    const x = info.zoneIndex * drawCanvas.width * zoneWidth + 8;
+    label.style.left = x + "px";
+    label.style.top  = "8px";
+  });
+}
+
+function applyDrawData(data) {
+  if (data.isEraser) {
+    drawCtx.globalCompositeOperation = "destination-out";
+    drawCtx.beginPath();
+    drawCtx.moveTo(data.prevX, data.prevY);
+    drawCtx.lineTo(data.x, data.y);
+    drawCtx.lineWidth = data.size;
+    drawCtx.lineCap   = "round";
+    drawCtx.stroke();
+    drawCtx.globalCompositeOperation = "source-over";
+  } else {
+    drawCtx.beginPath();
+    drawCtx.moveTo(data.prevX, data.prevY);
+    drawCtx.lineTo(data.x, data.y);
+    drawCtx.strokeStyle = data.color;
+    drawCtx.lineWidth   = data.size;
+    drawCtx.lineCap     = "round";
+    drawCtx.stroke();
+    drawCtx.closePath();
+  }
+}
+
+socket.on("draw", data => applyDrawData(data));
+
+socket.on("userList", list => {
+  list.forEach(u => {
+    users[u.user] = { zoneIndex: u.zoneIndex, color: u.color, labelEl: null };
+  });
+  updateLabels();
 });
 
 socket.on("userUpdate", data => {
-  users[data.user] = data.zoneIndex;
-
-  document.querySelectorAll(".username").forEach(el => el.remove());
-
-  Object.keys(users).forEach(u => {
-    const label = document.createElement("div");
-    label.className = "username";
-    label.style.left = (users[u] * drawCanvas.width * 0.225 + 10) + "px";
-    label.style.top = "10px";
-    label.textContent = u;
-    document.body.appendChild(label);
-  });
+  if (!users[data.user]) users[data.user] = { labelEl: null };
+  users[data.user].zoneIndex = data.zoneIndex;
+  users[data.user].color     = data.color;
+  updateLabels();
 });
 
-socket.on("clearCanvas", ()=>{
-  drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  document.querySelectorAll(".username").forEach(el => el.remove());
-  users = {};
+socket.on("userLeft", data => {
+  if (users[data.user]) {
+    if (users[data.user].labelEl) users[data.user].labelEl.remove();
+    delete users[data.user];
+  }
+});
+
+socket.on("clearCanvas", () => {
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
 });
 </script>
 </body>

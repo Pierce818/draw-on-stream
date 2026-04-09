@@ -2,201 +2,548 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Draw on Stream - Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Draw on Stream</title>
 <style>
-html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f0f0; }
-canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
-#drawingCanvas { z-index:1; }
-#guideCanvas { z-index:2; pointer-events:none; }
-
-#controls {
-  position: fixed; top:12px; left:50%; transform: translateX(-50%);
-  background: rgba(40,40,40,0.9); padding: 14px 20px; border-radius:16px;
-  display:flex; gap:12px; flex-wrap: wrap; align-items:center;
-  z-index:9999; color:#fff; font-size:14px; box-shadow:0 5px 18px rgba(0,0,0,0.35);
-  transition: all 0.3s ease;
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #16161e;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.035) 1px, transparent 0);
+  background-size: 28px 28px;
+  user-select: none; -webkit-user-select: none;
 }
-#controls input, #controls button { border:none; border-radius:8px; padding:6px 10px; font-size:14px; }
-#controls input { width:160px; position:relative; z-index:10000; }
 
-#colorPicker { display:grid; grid-template-columns: repeat(5, 28px); grid-gap:5px; }
-.color-btn { width:28px; height:28px; border-radius:6px; cursor:pointer; border:1px solid #fff; transition: all 0.2s; }
-.color-btn:hover { transform: scale(1.2); border-width:2px; }
-.color-btn.selected { border:2px solid #ff0; }
+canvas { position: absolute; top: 0; left: 0; touch-action: none; }
+#drawingCanvas { z-index: 1; width: 100%; height: 100%; }
+#guideCanvas   { z-index: 2; pointer-events: none; width: 100%; height: 100%; }
+#cursorCanvas  { z-index: 3; pointer-events: none; width: 100%; height: 100%; cursor: none; }
 
-#brushSize { width:100px; }
-#voteClear { background:#ff4d4d; color:#fff; cursor:pointer; }
-#voteClear:disabled { background:#999; cursor:not-allowed; }
+/* ── Panel ── */
+#controls {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  background: rgba(14, 14, 22, 0.93);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 14px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  z-index: 9999; color: #dde0f0; font-size: 13px;
+  width: min(360px, 92vw);
+  box-shadow: 0 12px 48px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+#controls.minimized > *:not(.ctrl-header) { display: none !important; }
+#controls.minimized { padding: 10px 14px; width: auto; min-width: 0; }
 
-#minimizeBtn { background:#888; color:#fff; cursor:pointer; padding:6px 10px; border-radius:8px; }
+/* header */
+.ctrl-header { display: flex; align-items: center; gap: 10px; }
+.ctrl-title {
+  flex: 1; font-size: 11px; font-weight: 700; letter-spacing: 1.1px;
+  text-transform: uppercase; color: #7070a0;
+}
+#minimizeBtn {
+  background: rgba(255,255,255,0.07); color: #888; border: none;
+  border-radius: 8px; width: 28px; height: 28px;
+  cursor: pointer; font-size: 18px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.18s; flex-shrink: 0;
+}
+#minimizeBtn:hover { background: rgba(255,255,255,0.14); color: #ccc; }
+
+/* divider */
+.ctrl-divider { height: 1px; background: rgba(255,255,255,0.07); }
+
+/* username */
+#nameRow { display: flex; gap: 8px; align-items: center; }
+#nameInput {
+  flex: 1; background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 8px 12px; color: #fff; font-size: 13px; outline: none;
+  transition: border-color 0.2s;
+}
+#nameInput:focus { border-color: rgba(130,180,255,0.5); background: rgba(255,255,255,0.1); }
+#nameInput::placeholder { color: rgba(255,255,255,0.22); }
+#setNameBtn {
+  background: rgba(100,160,255,0.18); color: #90b8ff;
+  border: 1px solid rgba(100,160,255,0.28); border-radius: 10px;
+  padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 700;
+  white-space: nowrap; transition: background 0.18s;
+}
+#setNameBtn:hover { background: rgba(100,160,255,0.33); }
+
+#userBadge {
+  display: none; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.06); border-radius: 10px; padding: 7px 12px;
+}
+#userDot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+#userNameDisplay { font-size: 13px; font-weight: 700; color: #fff; flex: 1; }
+#changeNameBtn {
+  font-size: 11px; color: rgba(255,255,255,0.3); cursor: pointer; transition: color 0.15s;
+}
+#changeNameBtn:hover { color: rgba(255,255,255,0.6); }
+
+/* color picker */
+#colorPicker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.color-btn {
+  width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+  border: 2px solid transparent; transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  flex-shrink: 0;
+}
+.color-btn:hover { transform: scale(1.2); }
+.color-btn.selected { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
+#eraserBtn {
+  width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+  background: rgba(255,255,255,0.08);
+  border: 2px dashed rgba(255,255,255,0.28);
+  color: rgba(255,255,255,0.45); font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s, border-color 0.12s, background 0.12s;
+  flex-shrink: 0;
+}
+#eraserBtn:hover { transform: scale(1.2); }
+#eraserBtn.selected { border-color: #fff; border-style: solid; background: rgba(255,255,255,0.18); color: #fff; }
+
+/* brush */
+.brush-row { display: flex; align-items: center; gap: 10px; }
+#brushPreviewWrap {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+#brushPreviewCircle { border-radius: 50%; transition: all 0.15s; }
+#brushSize {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12);
+  outline: none; cursor: pointer;
+}
+#brushSize::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: #c0c0e0; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+#brushSize::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; border: none;
+  background: #c0c0e0; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+#brushSizeLabel { font-size: 12px; color: #666; min-width: 30px; text-align: right; }
+
+/* online users */
+.users-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 22px; }
+#onlineCount { font-size: 11px; color: #555; white-space: nowrap; margin-right: 2px; }
+.user-pip {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.07); border-radius: 6px; padding: 3px 8px;
+  font-size: 12px; color: #aaa;
+}
+.user-pip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* vote button */
+#voteClear {
+  background: rgba(255,55,55,0.14); color: #ff8888;
+  border: 1px solid rgba(255,55,55,0.28); border-radius: 10px;
+  padding: 9px; cursor: pointer; font-size: 12px; font-weight: 700;
+  transition: background 0.18s; text-align: center; width: 100%;
+}
+#voteClear:hover:not(:disabled) { background: rgba(255,55,55,0.28); }
+#voteClear:disabled { opacity: 0.3; cursor: not-allowed; }
 </style>
 </head>
 <body>
 
-<div id="controls">
-  <button id="minimizeBtn">−</button>
-  <input id="nameInput" placeholder="Enter Twitch name" />
-  <div id="colorPicker"></div>
-  Brush: <input type="range" id="brushSize" min="1" max="20" value="4" />
-  <button id="voteClear">Vote to Clear</button>
-</div>
-
 <canvas id="drawingCanvas"></canvas>
 <canvas id="guideCanvas"></canvas>
+<canvas id="cursorCanvas"></canvas>
+
+<div id="controls">
+  <div class="ctrl-header">
+    <span class="ctrl-title">Draw on Stream</span>
+    <button id="minimizeBtn">−</button>
+  </div>
+
+  <div id="nameRow">
+    <input id="nameInput" placeholder="Your Twitch username" maxlength="25" autocomplete="off" />
+    <button id="setNameBtn">Set</button>
+  </div>
+  <div id="userBadge">
+    <div id="userDot"></div>
+    <span id="userNameDisplay"></span>
+    <span id="changeNameBtn">change</span>
+  </div>
+
+  <div class="ctrl-divider"></div>
+
+  <div id="colorPicker"></div>
+
+  <div class="brush-row">
+    <div id="brushPreviewWrap"><div id="brushPreviewCircle"></div></div>
+    <input type="range" id="brushSize" min="1" max="40" value="6" />
+    <span id="brushSizeLabel">6px</span>
+  </div>
+
+  <div class="ctrl-divider"></div>
+
+  <div class="users-row">
+    <span id="onlineCount">0 online</span>
+    <div id="usersList" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+  </div>
+
+  <button id="voteClear">Vote to Clear Canvas</button>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const drawCanvas = document.getElementById("drawingCanvas");
-const drawCtx = drawCanvas.getContext("2d");
-drawCanvas.width = window.innerWidth;
-drawCanvas.height = window.innerHeight;
+socket.emit("setType", "viewer");
 
-const guideCanvas = document.getElementById("guideCanvas");
-const guideCtx = guideCanvas.getContext("2d");
-guideCanvas.width = window.innerWidth;
-guideCanvas.height = window.innerHeight;
+// ── Canvases ────────────────────────────────────────────────────────────────
+const drawCanvas   = document.getElementById("drawingCanvas");
+const drawCtx      = drawCanvas.getContext("2d");
+const guideCanvas  = document.getElementById("guideCanvas");
+const guideCtx     = guideCanvas.getContext("2d");
+const cursorCanvas = document.getElementById("cursorCanvas");
+const cursorCtx    = cursorCanvas.getContext("2d");
 
-let username = "";
-let drawing = false;
+function resizeAll() {
+  [drawCanvas, guideCanvas, cursorCanvas].forEach(c => {
+    c.width  = window.innerWidth;
+    c.height = window.innerHeight;
+  });
+}
+resizeAll();
+window.addEventListener("resize", resizeAll);
+
+// ── State ────────────────────────────────────────────────────────────────────
+let username   = "";
+let myZoneColor = "#888";
+let drawing    = false;
 let drawStarted = false;
-let color = "#FF0000";
-let brushSize = 4;
+let color      = "#FF4444";
+let isEraser   = false;
+let brushSize  = 6;
 let prevX = null, prevY = null;
-let zoneIndex = 0;
-let zoneWidth = 0.225;
+let zoneIndex  = 0;
+let zoneWidth  = 0.225;
+let mouseX = 0, mouseY = 0;
+let onlineUsers = {}; // { name: { zoneIndex, color } }
 
-// Username input
-const nameInput = document.getElementById("nameInput");
-nameInput.addEventListener("change", e=>{
-  const name = e.target.value.trim();
-  if(name.length>0){
-    username = name;
-    socket.emit("setUsername", username);
-  }
+// ── Username ─────────────────────────────────────────────────────────────────
+const nameInput       = document.getElementById("nameInput");
+const setNameBtn      = document.getElementById("setNameBtn");
+const nameRow         = document.getElementById("nameRow");
+const userBadge       = document.getElementById("userBadge");
+const userDot         = document.getElementById("userDot");
+const userNameDisplay = document.getElementById("userNameDisplay");
+
+function applyUsername(name) {
+  if (!name) return;
+  username = name;
+  socket.emit("setUsername", username);
+  nameRow.style.display = "none";
+  userDot.style.background = myZoneColor;
+  userDot.style.color = myZoneColor;
+  userNameDisplay.textContent = username;
+  userBadge.style.display = "flex";
+}
+
+setNameBtn.addEventListener("click", () => applyUsername(nameInput.value.trim()));
+nameInput.addEventListener("keydown", e => { if (e.key === "Enter") applyUsername(nameInput.value.trim()); });
+
+document.getElementById("changeNameBtn").addEventListener("click", () => {
+  username = "";
+  userBadge.style.display = "none";
+  nameRow.style.display = "flex";
+  nameInput.value = "";
+  nameInput.focus();
 });
 
-// Photoshop-style color picker
-const colors = ["#FF0000","#FF7F00","#FFFF00","#00FF00","#00FFFF","#0000FF","#8B00FF","#FFFFFF","#000000","#C0C0C0"];
+// ── Color picker ─────────────────────────────────────────────────────────────
+const colorList = [
+  "#FF4444","#FF8800","#FFE000","#44DD55","#00DDDD",
+  "#4488FF","#AA44FF","#FF44AA","#FFFFFF","#333333"
+];
 const colorPicker = document.getElementById("colorPicker");
-colors.forEach(c=>{
+
+colorList.forEach(c => {
   const btn = document.createElement("div");
-  btn.classList.add("color-btn");
-  btn.style.background=c;
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".color-btn").forEach(b=>b.classList.remove("selected"));
-    btn.classList.add("selected");
-    color = c;
-  });
+  btn.className = "color-btn";
+  btn.style.background = c;
+  if (c === "#FFFFFF") btn.style.outline = "1px solid rgba(255,255,255,0.2)";
+  btn.addEventListener("click", () => selectColor(c, btn));
   colorPicker.appendChild(btn);
 });
 colorPicker.firstChild.classList.add("selected");
+color = colorList[0];
 
-// Brush size
-document.getElementById("brushSize").addEventListener("input", e=>brushSize=e.target.value);
+const eraserBtn = document.getElementById("eraserBtn") || (() => {
+  const b = document.createElement("div");
+  b.id = "eraserBtn";
+  b.title = "Eraser";
+  b.textContent = "✕";
+  colorPicker.appendChild(b);
+  return b;
+})();
+eraserBtn.addEventListener("click", () => selectEraser());
 
-// Vote to clear
-const voteClearBtn = document.getElementById("voteClear");
-voteClearBtn.addEventListener("click", ()=>{
-  socket.emit("voteClear", username);
-  voteClearBtn.disabled = true;
+function selectColor(c, btn) {
+  document.querySelectorAll(".color-btn").forEach(b => b.classList.remove("selected"));
+  eraserBtn.classList.remove("selected");
+  if (btn) btn.classList.add("selected");
+  color = c;
+  isEraser = false;
+  updateBrushPreview();
+}
+
+function selectEraser() {
+  document.querySelectorAll(".color-btn").forEach(b => b.classList.remove("selected"));
+  eraserBtn.classList.add("selected");
+  isEraser = true;
+  updateBrushPreview();
+}
+
+// ── Brush preview ─────────────────────────────────────────────────────────────
+const brushPreviewCircle = document.getElementById("brushPreviewCircle");
+const brushSizeInput     = document.getElementById("brushSize");
+const brushSizeLabel     = document.getElementById("brushSizeLabel");
+
+function updateBrushPreview() {
+  const sz = Math.min(brushSize, 30);
+  brushPreviewCircle.style.width  = sz + "px";
+  brushPreviewCircle.style.height = sz + "px";
+  brushPreviewCircle.style.background = isEraser
+    ? "rgba(255,255,255,0.15)"
+    : color;
+  if (isEraser) {
+    brushPreviewCircle.style.border = "2px dashed rgba(255,255,255,0.4)";
+  } else {
+    brushPreviewCircle.style.border = "none";
+  }
+}
+
+brushSizeInput.addEventListener("input", e => {
+  brushSize = parseInt(e.target.value);
+  brushSizeLabel.textContent = brushSize + "px";
+  updateBrushPreview();
 });
+updateBrushPreview();
 
-// Minimize/Expand UI
+// ── Minimize ──────────────────────────────────────────────────────────────────
 const controlsDiv = document.getElementById("controls");
 const minimizeBtn = document.getElementById("minimizeBtn");
 let minimized = false;
-minimizeBtn.addEventListener("click", ()=>{
+minimizeBtn.addEventListener("click", () => {
   minimized = !minimized;
-  if(minimized){
-    Array.from(controlsDiv.children).forEach(c=>{
-      if(c!==minimizeBtn) c.style.display="none";
-    });
-    minimizeBtn.textContent = "+";
+  controlsDiv.classList.toggle("minimized", minimized);
+  minimizeBtn.textContent = minimized ? "+" : "−";
+});
+
+// ── Vote to clear ─────────────────────────────────────────────────────────────
+const voteClearBtn = document.getElementById("voteClear");
+voteClearBtn.addEventListener("click", () => {
+  socket.emit("voteClear");
+  voteClearBtn.disabled = true;
+});
+
+// ── Socket events ─────────────────────────────────────────────────────────────
+socket.on("zoneAssigned", data => {
+  zoneIndex  = data.index;
+  zoneWidth  = data.width;
+  myZoneColor = data.color;
+  userDot.style.background = myZoneColor;
+  userDot.style.color = myZoneColor;
+});
+
+socket.on("userList", list => {
+  list.forEach(u => { onlineUsers[u.user] = { zoneIndex: u.zoneIndex, color: u.color }; });
+  renderUsersList();
+});
+
+socket.on("userUpdate", data => {
+  onlineUsers[data.user] = { zoneIndex: data.zoneIndex, color: data.color };
+  renderUsersList();
+});
+
+socket.on("userLeft", data => {
+  delete onlineUsers[data.user];
+  renderUsersList();
+});
+
+// Draw strokes from other users
+socket.on("draw", data => {
+  applyDrawData(drawCtx, data);
+});
+
+socket.on("clearCanvas", () => {
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  drawStarted = false;
+  voteClearBtn.disabled = false;
+});
+
+function applyDrawData(ctx, data) {
+  if (data.isEraser) {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.moveTo(data.prevX, data.prevY);
+    ctx.lineTo(data.x, data.y);
+    ctx.lineWidth = data.size;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
   } else {
-    Array.from(controlsDiv.children).forEach(c=>c.style.display="flex");
-    minimizeBtn.textContent = "−";
-  }
-});
-
-// Zone assignment
-socket.on("zoneAssigned", data=>{
-  zoneIndex = data.index;
-  zoneWidth = data.width;
-});
-
-// Draw guide
-function drawZoneGuide(){
-  guideCtx.clearRect(0,0,guideCanvas.width, guideCanvas.height);
-  const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
-  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height*0.5);
-
-  guideCtx.fillStyle = "rgba(255,255,255,0.05)";
-  guideCtx.fillRect(zoneStartX,0,zoneSize,zoneSize);
-  guideCtx.strokeStyle = "black";
-  guideCtx.lineWidth = 3;
-  guideCtx.strokeRect(zoneStartX,0,zoneSize,zoneSize);
-
-  if(!drawStarted && username!==""){
-    guideCtx.font = "22px Arial";
-    guideCtx.fillStyle = "rgba(0,0,0,0.7)";
-    guideCtx.textAlign = "center";
-    guideCtx.fillText("Draw Here", zoneStartX + zoneSize/2, zoneSize/2);
-  }
-
-  if(username===""){
-    guideCtx.font="18px Arial";
-    guideCtx.fillStyle="rgba(255,0,0,0.8)";
-    guideCtx.textAlign="center";
-    guideCtx.fillText("Enter your Twitch name above to draw", drawCanvas.width/2, 50);
+    ctx.beginPath();
+    ctx.moveTo(data.prevX, data.prevY);
+    ctx.lineTo(data.x, data.y);
+    ctx.strokeStyle = data.color;
+    ctx.lineWidth = data.size;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.closePath();
   }
 }
-setInterval(drawZoneGuide, 100);
 
-// Drawing
-function startDraw(e){ if(username==="") return; drawing=true; drawStarted=true; prevX=null; prevY=null; }
-function stopDraw(){ drawing=false; prevX=null; prevY=null; }
+// ── Online users list ─────────────────────────────────────────────────────────
+function renderUsersList() {
+  const list  = document.getElementById("usersList");
+  const count = document.getElementById("onlineCount");
+  list.innerHTML = "";
+  const entries = Object.entries(onlineUsers);
+  count.textContent = entries.length + " online";
+  entries.slice(0, 6).forEach(([name, info]) => {
+    const pip = document.createElement("div");
+    pip.className = "user-pip";
+    pip.innerHTML = `<div class="user-pip-dot" style="background:${info.color}"></div><span>${name}</span>`;
+    list.appendChild(pip);
+  });
+  if (entries.length > 6) {
+    const more = document.createElement("div");
+    more.className = "user-pip";
+    more.textContent = `+${entries.length - 6}`;
+    list.appendChild(more);
+  }
+}
+
+// ── Zone guide ────────────────────────────────────────────────────────────────
+function drawZoneGuide() {
+  guideCtx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+  const startX   = zoneIndex * drawCanvas.width * zoneWidth;
+  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height * 0.5);
+
+  // Subtle fill
+  guideCtx.fillStyle = "rgba(255,255,255,0.025)";
+  guideCtx.fillRect(startX, 0, zoneSize, zoneSize);
+
+  // Dashed border using zone color
+  guideCtx.strokeStyle = myZoneColor + "90";
+  guideCtx.lineWidth   = 1.5;
+  guideCtx.setLineDash([8, 5]);
+  guideCtx.strokeRect(startX + 1, 1, zoneSize - 2, zoneSize - 2);
+  guideCtx.setLineDash([]);
+
+  // Corner accent lines
+  const accentLen = 16;
+  guideCtx.strokeStyle = myZoneColor;
+  guideCtx.lineWidth   = 3;
+  [
+    [startX, 0, startX + accentLen, 0],
+    [startX, 0, startX, accentLen],
+    [startX + zoneSize, 0, startX + zoneSize - accentLen, 0],
+    [startX + zoneSize, 0, startX + zoneSize, accentLen],
+    [startX, zoneSize, startX + accentLen, zoneSize],
+    [startX, zoneSize, startX, zoneSize - accentLen],
+    [startX + zoneSize, zoneSize, startX + zoneSize - accentLen, zoneSize],
+    [startX + zoneSize, zoneSize, startX + zoneSize, zoneSize - accentLen],
+  ].forEach(([x1,y1,x2,y2]) => {
+    guideCtx.beginPath(); guideCtx.moveTo(x1,y1); guideCtx.lineTo(x2,y2); guideCtx.stroke();
+  });
+
+  if (!drawStarted && username) {
+    guideCtx.font = "bold 18px -apple-system, sans-serif";
+    guideCtx.fillStyle = "rgba(255,255,255,0.4)";
+    guideCtx.textAlign = "center";
+    guideCtx.fillText("Draw here!", startX + zoneSize / 2, zoneSize / 2);
+  }
+
+  if (!username) {
+    guideCtx.font = "bold 14px -apple-system, sans-serif";
+    guideCtx.fillStyle = "rgba(255,220,100,0.85)";
+    guideCtx.textAlign = "center";
+    guideCtx.fillText("Set your Twitch username above to start drawing", drawCanvas.width / 2, 52);
+  }
+}
+setInterval(drawZoneGuide, 120);
+
+// ── Cursor preview ────────────────────────────────────────────────────────────
+function drawCustomCursor() {
+  cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+  const r = brushSize / 2;
+
+  cursorCtx.beginPath();
+  cursorCtx.arc(mouseX, mouseY, Math.max(r, 1), 0, Math.PI * 2);
+
+  if (isEraser) {
+    cursorCtx.strokeStyle = "rgba(255,255,255,0.7)";
+    cursorCtx.lineWidth   = 1.5;
+    cursorCtx.stroke();
+  } else {
+    cursorCtx.fillStyle   = color + "55";
+    cursorCtx.strokeStyle = "rgba(0,0,0,0.55)";
+    cursorCtx.lineWidth   = 1;
+    cursorCtx.fill();
+    cursorCtx.stroke();
+  }
+
+  // Center dot
+  cursorCtx.beginPath();
+  cursorCtx.arc(mouseX, mouseY, 1.5, 0, Math.PI * 2);
+  cursorCtx.fillStyle = "rgba(255,255,255,0.9)";
+  cursorCtx.fill();
+}
+
+drawCanvas.addEventListener("mousemove", e => { mouseX = e.clientX; mouseY = e.clientY; drawCustomCursor(); });
+drawCanvas.addEventListener("mouseleave", () => cursorCtx.clearRect(0,0,cursorCanvas.width,cursorCanvas.height));
+drawCanvas.style.cursor = "none";
+
+// ── Drawing ───────────────────────────────────────────────────────────────────
+function getPos(e) {
+  if (e.touches) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+
+function startDraw(e) {
+  if (!username) return;
+  drawing = true;
+  drawStarted = true;
+  const p = getPos(e);
+  prevX = p.x; prevY = p.y;
+}
+function stopDraw() { drawing = false; prevX = null; prevY = null; }
 
 drawCanvas.addEventListener("mousedown", startDraw);
-drawCanvas.addEventListener("mouseup", stopDraw);
-drawCanvas.addEventListener("touchstart", startDraw);
-drawCanvas.addEventListener("touchend", stopDraw);
-drawCanvas.addEventListener("mousemove", draw);
-drawCanvas.addEventListener("touchmove", draw);
+drawCanvas.addEventListener("mouseup",   stopDraw);
+drawCanvas.addEventListener("mouseleave", stopDraw);
+drawCanvas.addEventListener("touchstart", e => { e.preventDefault(); startDraw(e); }, { passive: false });
+drawCanvas.addEventListener("touchend",  stopDraw);
+drawCanvas.addEventListener("touchmove", e => { e.preventDefault(); handleDraw(e); }, { passive: false });
+drawCanvas.addEventListener("mousemove", handleDraw);
 
-function draw(e){
-  if(!drawing || username==="") return;
+function handleDraw(e) {
+  mouseX = getPos(e).x; mouseY = getPos(e).y;
+  drawCustomCursor();
+  if (!drawing || !username) return;
 
-  let x = e.touches ? e.touches[0].clientX : e.clientX;
-  let y = e.touches ? e.touches[0].clientY : e.clientY;
+  const p = getPos(e);
+  let x = p.x, y = p.y;
 
-  const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
-  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height*0.5);
+  const startX   = zoneIndex * drawCanvas.width * zoneWidth;
+  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height * 0.5);
+  x = Math.max(startX, Math.min(x, startX + zoneSize));
+  y = Math.max(0,      Math.min(y, zoneSize));
 
-  x = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
-  y = Math.max(0, Math.min(y, zoneSize));
-
-  if(prevX!==null && prevY!==null){
-    socket.emit("draw", { user:username, color, size:brushSize, prevX, prevY, x, y, zoneIndex });
-
-    drawCtx.beginPath();
-    drawCtx.moveTo(prevX, prevY);
-    drawCtx.lineTo(x, y);
-    drawCtx.strokeStyle=color;
-    drawCtx.lineWidth=brushSize;
-    drawCtx.lineCap="round";
-    drawCtx.stroke();
-    drawCtx.closePath();
+  if (prevX !== null && prevY !== null) {
+    const data = { user: username, color, size: brushSize, prevX, prevY, x, y, zoneIndex, isEraser };
+    applyDrawData(drawCtx, data);
+    socket.emit("draw", data);
   }
 
-  prevX = x;
-  prevY = y;
+  prevX = x; prevY = y;
 }
-
-socket.on("clearCanvas", ()=>{
-  drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  drawStarted=false;
-});
 </script>
 </body>
 </html>
