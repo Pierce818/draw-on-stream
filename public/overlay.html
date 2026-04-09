@@ -18,18 +18,18 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Users object: stores username, drawing state, per-stroke last point, zone, and color
+// Store last stroke per user
 const users = {};
 
 // Draw event from viewer
 socket.on("draw", data => {
-    const zoneWidth = Math.min(canvas.width * 0.225, canvas.height * 0.5); 
+    const zoneWidth = Math.min(canvas.width * 0.225, canvas.height * 0.5);
     const zoneStartX = data.zoneIndex * canvas.width * 0.225;
+    const zoneSize = Math.min(canvas.width * 0.225, canvas.height * 0.5);
 
-    const x = zoneStartX + data.normX * zoneWidth;
-    const y = data.normY * zoneWidth;
+    const x = zoneStartX + data.normX * zoneSize;
+    const y = data.normY * zoneSize;
 
-    // Only draw if the user is actively drawing and has a lastStroke
     if(users[data.user]?.drawing && users[data.user].lastStroke){
         const last = users[data.user].lastStroke;
         ctx.beginPath();
@@ -42,7 +42,7 @@ socket.on("draw", data => {
         ctx.closePath();
     }
 
-    // Update the per-stroke last point
+    // Update stroke info
     users[data.user] = {
         ...users[data.user],
         lastStroke: {x, y},
@@ -52,18 +52,18 @@ socket.on("draw", data => {
         color: data.color
     };
 
-    // Draw username above the zone
+    // Draw username above zone
     ctx.font = "16px Arial";
     ctx.fillStyle = data.color;
     ctx.textAlign = "center";
-    ctx.fillText(data.user, zoneStartX + zoneWidth / 2, zoneWidth + 18);
+    ctx.fillText(data.user, zoneStartX + zoneSize / 2, zoneSize + 18);
 });
 
-// Stop drawing event
+// Stop stroke event
 socket.on("stopDraw", username => {
     if(users[username]){
         users[username].drawing = false;
-        users[username].lastStroke = null; // important: forget last point to prevent snapping
+        users[username].lastStroke = null; // important: prevents snapping
     }
 });
 
