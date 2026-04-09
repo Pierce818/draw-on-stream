@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Draw on Stream</title>
+<title>Draw on Stream - Viewer</title>
 <style>
 html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f0f0; }
 canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
@@ -73,9 +73,10 @@ nameInput.addEventListener("change", e=>{
   if(name.length>0) username = name;
 });
 
-// --- Photoshop-style color picker
+// --- Color picker
 const colors = ["#FF0000","#FF7F00","#FFFF00","#00FF00","#00FFFF","#0000FF","#8B00FF","#FFFFFF","#000000","#C0C0C0"];
 const colorPicker = document.getElementById("colorPicker");
+
 colors.forEach(c=>{
   const btn = document.createElement("div");
   btn.classList.add("color-btn");
@@ -99,19 +100,19 @@ voteClearBtn.addEventListener("click", ()=>{
   voteClearBtn.disabled = true;
 });
 
-// --- Minimize/Expand UI
+// --- Minimize UI
 const controlsDiv = document.getElementById("controls");
 const minimizeBtn = document.getElementById("minimizeBtn");
 let minimized = false;
 minimizeBtn.addEventListener("click", ()=>{
   minimized = !minimized;
   Array.from(controlsDiv.children).forEach(c=>{
-    if(c!==minimizeBtn) c.style.display=minimized ? "none":"flex";
+    if(c!==minimizeBtn) c.style.display = minimized ? "none" : "flex";
   });
   minimizeBtn.textContent = minimized ? "+" : "−";
 });
 
-// --- Assigned zone
+// --- Zone assignment
 socket.on("zoneAssigned", data=>{
   zoneIndex = data.index;
   zoneWidth = data.width;
@@ -146,19 +147,20 @@ function drawZoneGuide(){
 setInterval(drawZoneGuide, 100);
 
 // --- Drawing
-function startDraw(e){
-  if(username==="") return;
-  drawing=true;
-  drawStarted=true;
-  prevX=null; // reset previous stroke coordinates here
-  prevY=null;
-}
+function startDraw(e){ 
+  if(username==="") return; 
+  drawing=true; drawStarted=true;
 
-function stopDraw(){
-  drawing=false;
-  prevX=null;
-  prevY=null;
+  let x = e.touches ? e.touches[0].clientX : e.clientX;
+  let y = e.touches ? e.touches[0].clientY : e.clientY;
+
+  const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
+  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height*0.5);
+
+  prevX = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
+  prevY = Math.max(0, Math.min(y, zoneSize));
 }
+function stopDraw(){ drawing=false; prevX=null; prevY=null; }
 
 drawCanvas.addEventListener("mousedown", startDraw);
 drawCanvas.addEventListener("mouseup", stopDraw);
@@ -179,27 +181,29 @@ function draw(e){
   x = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
   y = Math.max(0, Math.min(y, zoneSize));
 
-  if(prevX!==null && prevY!==null){
-    // send normalized coordinates to server
-    const normX = (x - zoneStartX)/zoneSize;
-    const normY = y/zoneSize;
-    socket.emit("draw", { user:username, color, size:brushSize, normX, normY, zoneIndex });
-
+  if(prevX !== null && prevY !== null){
     drawCtx.beginPath();
     drawCtx.moveTo(prevX, prevY);
     drawCtx.lineTo(x, y);
-    drawCtx.strokeStyle=color;
-    drawCtx.lineWidth=brushSize;
-    drawCtx.lineCap="round";
+    drawCtx.strokeStyle = color;
+    drawCtx.lineWidth = brushSize;
+    drawCtx.lineCap = "round";
     drawCtx.stroke();
     drawCtx.closePath();
+
+    // Emit to server
+    socket.emit("draw", { user: username, color, size: brushSize, x, y, prevX, prevY, zoneIndex });
+
+    // Draw username label
+    drawCtx.font = "16px Arial";
+    drawCtx.fillStyle = "#000";
+    drawCtx.fillText(username, zoneStartX + 10, 20);
   }
 
   prevX = x;
   prevY = y;
 }
 
-// --- Clear canvas
 socket.on("clearCanvas", ()=>{
   drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   drawStarted=false;

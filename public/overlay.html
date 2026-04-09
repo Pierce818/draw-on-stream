@@ -2,54 +2,52 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Overlay</title>
+<title>Draw on Stream - Overlay</title>
 <style>
-html, body { margin:0; padding:0; overflow:hidden; background:transparent; }
-canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
+html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:transparent; }
+canvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+#drawingCanvas { z-index:1; }
+#usernameLayer { position:absolute; top:0; left:0; z-index:2; pointer-events:none; font-family:'Segoe UI', sans-serif; color:#000; font-weight:bold; }
 </style>
 </head>
 <body>
-<canvas id="overlayCanvas"></canvas>
+<canvas id="drawingCanvas"></canvas>
+<div id="usernameLayer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const overlay = document.getElementById("overlayCanvas");
-const ctx = overlay.getContext("2d");
-overlay.width = window.innerWidth;
-overlay.height = window.innerHeight;
+const drawCanvas = document.getElementById("drawingCanvas");
+const drawCtx = drawCanvas.getContext("2d");
+drawCanvas.width = window.innerWidth;
+drawCanvas.height = window.innerHeight;
 
-let userStrokes = {}; // track last positions per user
+const usernameLayer = document.getElementById("usernameLayer");
 
-socket.on("draw", data=>{
-  const {user,color,size,normX,normY,zoneIndex} = data;
+let users = {}; // track each user’s last position
 
-  const zoneStartX = zoneIndex * overlay.width * 0.225;
-  const zoneSize = Math.min(overlay.width*0.225, overlay.height*0.5);
+socket.on("draw", data => {
+  const zoneStartX = data.zoneIndex * drawCanvas.width * 0.225;
+  const zoneSize = Math.min(drawCanvas.width * 0.225, drawCanvas.height*0.5);
 
-  const x = zoneStartX + normX*zoneSize;
-  const y = normY*zoneSize;
+  drawCtx.beginPath();
+  drawCtx.moveTo(data.prevX, data.prevY);
+  drawCtx.lineTo(data.x, data.y);
+  drawCtx.strokeStyle = data.color;
+  drawCtx.lineWidth = data.size;
+  drawCtx.lineCap = "round";
+  drawCtx.stroke();
+  drawCtx.closePath();
 
-  if(!userStrokes[user]) userStrokes[user]={prevX:null, prevY:null};
-
-  if(userStrokes[user].prevX!==null && userStrokes[user].prevY!==null){
-    ctx.beginPath();
-    ctx.moveTo(userStrokes[user].prevX, userStrokes[user].prevY);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle=color;
-    ctx.lineWidth=size;
-    ctx.lineCap="round";
-    ctx.stroke();
-    ctx.closePath();
-  }
-
-  userStrokes[user].prevX = x;
-  userStrokes[user].prevY = y;
+  // Show username at top-left of their zone
+  usernameLayer.style.left = zoneStartX + 10 + "px";
+  usernameLayer.style.top = "10px";
+  usernameLayer.textContent = data.user;
 });
 
 socket.on("clearCanvas", ()=>{
-  ctx.clearRect(0,0,overlay.width, overlay.height);
-  userStrokes={};
+  drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  usernameLayer.textContent = "";
 });
 </script>
 </body>
