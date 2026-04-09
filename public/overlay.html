@@ -18,9 +18,10 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Users object: stores last position, username, drawing state, zone, and color
+// Users object: stores username, drawing state, per-stroke last point, zone, and color
 const users = {};
 
+// Draw event from viewer
 socket.on("draw", data => {
     const zoneWidth = Math.min(canvas.width * 0.225, canvas.height * 0.5); 
     const zoneStartX = data.zoneIndex * canvas.width * 0.225;
@@ -28,9 +29,9 @@ socket.on("draw", data => {
     const x = zoneStartX + data.normX * zoneWidth;
     const y = data.normY * zoneWidth;
 
-    // Only draw if the user is actively drawing
-    if(users[data.user]?.drawing && users[data.user].last){
-        const last = users[data.user].last;
+    // Only draw if the user is actively drawing and has a lastStroke
+    if(users[data.user]?.drawing && users[data.user].lastStroke){
+        const last = users[data.user].lastStroke;
         ctx.beginPath();
         ctx.moveTo(last.x, last.y);
         ctx.lineTo(x, y);
@@ -41,11 +42,12 @@ socket.on("draw", data => {
         ctx.closePath();
     }
 
-    // Update user state
+    // Update the per-stroke last point
     users[data.user] = {
-        last: {x, y},
-        username: data.user,
+        ...users[data.user],
+        lastStroke: {x, y},
         drawing: true,
+        username: data.user,
         zoneIndex: data.zoneIndex,
         color: data.color
     };
@@ -57,13 +59,16 @@ socket.on("draw", data => {
     ctx.fillText(data.user, zoneStartX + zoneWidth / 2, zoneWidth + 18);
 });
 
-// Stop drawing when viewer signals
+// Stop drawing event
 socket.on("stopDraw", username => {
-    if(users[username]) users[username].drawing = false;
+    if(users[username]){
+        users[username].drawing = false;
+        users[username].lastStroke = null; // important: forget last point to prevent snapping
+    }
 });
 
 // Clear canvas
-socket.on("clearCanvas", ()=>{
+socket.on("clearCanvas", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for(const u in users) delete users[u];
 });
