@@ -7,12 +7,11 @@
 html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:transparent; }
 canvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
 #drawingCanvas { z-index:1; }
-#usernameLayer { position:absolute; top:0; left:0; z-index:2; pointer-events:none; font-family:'Segoe UI', sans-serif; color:#000; font-weight:bold; }
+.username { position:absolute; z-index:2; pointer-events:none; font-family:'Segoe UI', sans-serif; color:#000; font-weight:bold; }
 </style>
 </head>
 <body>
 <canvas id="drawingCanvas"></canvas>
-<div id="usernameLayer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -22,14 +21,9 @@ const drawCtx = drawCanvas.getContext("2d");
 drawCanvas.width = window.innerWidth;
 drawCanvas.height = window.innerHeight;
 
-const usernameLayer = document.getElementById("usernameLayer");
-
-let users = {}; // track each user’s last position
+let users = {}; // { username: zoneIndex }
 
 socket.on("draw", data => {
-  const zoneStartX = data.zoneIndex * drawCanvas.width * 0.225;
-  const zoneSize = Math.min(drawCanvas.width * 0.225, drawCanvas.height*0.5);
-
   drawCtx.beginPath();
   drawCtx.moveTo(data.prevX, data.prevY);
   drawCtx.lineTo(data.x, data.y);
@@ -38,16 +32,27 @@ socket.on("draw", data => {
   drawCtx.lineCap = "round";
   drawCtx.stroke();
   drawCtx.closePath();
+});
 
-  // Show username at top-left of their zone
-  usernameLayer.style.left = zoneStartX + 10 + "px";
-  usernameLayer.style.top = "10px";
-  usernameLayer.textContent = data.user;
+socket.on("userUpdate", data => {
+  users[data.user] = data.zoneIndex;
+
+  document.querySelectorAll(".username").forEach(el => el.remove());
+
+  Object.keys(users).forEach(u => {
+    const label = document.createElement("div");
+    label.className = "username";
+    label.style.left = (users[u] * drawCanvas.width * 0.225 + 10) + "px";
+    label.style.top = "10px";
+    label.textContent = u;
+    document.body.appendChild(label);
+  });
 });
 
 socket.on("clearCanvas", ()=>{
   drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  usernameLayer.textContent = "";
+  document.querySelectorAll(".username").forEach(el => el.remove());
+  users = {};
 });
 </script>
 </body>

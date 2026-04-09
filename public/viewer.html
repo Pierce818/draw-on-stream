@@ -66,17 +66,19 @@ let prevX = null, prevY = null;
 let zoneIndex = 0;
 let zoneWidth = 0.225;
 
-// --- Username input
+// Username input
 const nameInput = document.getElementById("nameInput");
 nameInput.addEventListener("change", e=>{
   const name = e.target.value.trim();
-  if(name.length>0) username = name;
+  if(name.length>0){
+    username = name;
+    socket.emit("setUsername", username);
+  }
 });
 
-// --- Color picker
+// Photoshop-style color picker
 const colors = ["#FF0000","#FF7F00","#FFFF00","#00FF00","#00FFFF","#0000FF","#8B00FF","#FFFFFF","#000000","#C0C0C0"];
 const colorPicker = document.getElementById("colorPicker");
-
 colors.forEach(c=>{
   const btn = document.createElement("div");
   btn.classList.add("color-btn");
@@ -90,35 +92,40 @@ colors.forEach(c=>{
 });
 colorPicker.firstChild.classList.add("selected");
 
-// --- Brush size
+// Brush size
 document.getElementById("brushSize").addEventListener("input", e=>brushSize=e.target.value);
 
-// --- Vote to clear
+// Vote to clear
 const voteClearBtn = document.getElementById("voteClear");
 voteClearBtn.addEventListener("click", ()=>{
   socket.emit("voteClear", username);
   voteClearBtn.disabled = true;
 });
 
-// --- Minimize UI
+// Minimize/Expand UI
 const controlsDiv = document.getElementById("controls");
 const minimizeBtn = document.getElementById("minimizeBtn");
 let minimized = false;
 minimizeBtn.addEventListener("click", ()=>{
   minimized = !minimized;
-  Array.from(controlsDiv.children).forEach(c=>{
-    if(c!==minimizeBtn) c.style.display = minimized ? "none" : "flex";
-  });
-  minimizeBtn.textContent = minimized ? "+" : "−";
+  if(minimized){
+    Array.from(controlsDiv.children).forEach(c=>{
+      if(c!==minimizeBtn) c.style.display="none";
+    });
+    minimizeBtn.textContent = "+";
+  } else {
+    Array.from(controlsDiv.children).forEach(c=>c.style.display="flex");
+    minimizeBtn.textContent = "−";
+  }
 });
 
-// --- Zone assignment
+// Zone assignment
 socket.on("zoneAssigned", data=>{
   zoneIndex = data.index;
   zoneWidth = data.width;
 });
 
-// --- Draw guide
+// Draw guide
 function drawZoneGuide(){
   guideCtx.clearRect(0,0,guideCanvas.width, guideCanvas.height);
   const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
@@ -146,20 +153,8 @@ function drawZoneGuide(){
 }
 setInterval(drawZoneGuide, 100);
 
-// --- Drawing
-function startDraw(e){ 
-  if(username==="") return; 
-  drawing=true; drawStarted=true;
-
-  let x = e.touches ? e.touches[0].clientX : e.clientX;
-  let y = e.touches ? e.touches[0].clientY : e.clientY;
-
-  const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
-  const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height*0.5);
-
-  prevX = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
-  prevY = Math.max(0, Math.min(y, zoneSize));
-}
+// Drawing
+function startDraw(e){ if(username==="") return; drawing=true; drawStarted=true; prevX=null; prevY=null; }
 function stopDraw(){ drawing=false; prevX=null; prevY=null; }
 
 drawCanvas.addEventListener("mousedown", startDraw);
@@ -181,23 +176,17 @@ function draw(e){
   x = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
   y = Math.max(0, Math.min(y, zoneSize));
 
-  if(prevX !== null && prevY !== null){
+  if(prevX!==null && prevY!==null){
+    socket.emit("draw", { user:username, color, size:brushSize, prevX, prevY, x, y, zoneIndex });
+
     drawCtx.beginPath();
     drawCtx.moveTo(prevX, prevY);
     drawCtx.lineTo(x, y);
-    drawCtx.strokeStyle = color;
-    drawCtx.lineWidth = brushSize;
-    drawCtx.lineCap = "round";
+    drawCtx.strokeStyle=color;
+    drawCtx.lineWidth=brushSize;
+    drawCtx.lineCap="round";
     drawCtx.stroke();
     drawCtx.closePath();
-
-    // Emit to server
-    socket.emit("draw", { user: username, color, size: brushSize, x, y, prevX, prevY, zoneIndex });
-
-    // Draw username label
-    drawCtx.font = "16px Arial";
-    drawCtx.fillStyle = "#000";
-    drawCtx.fillText(username, zoneStartX + 10, 20);
   }
 
   prevX = x;
