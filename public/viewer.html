@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Draw on Stream</title>
+<title>Draw on Stream - Viewer</title>
 <style>
 html, body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f0f0; }
 canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
@@ -28,9 +28,7 @@ canvas { position:absolute; top:0; left:0; width:100%; height:100%; touch-action
 #voteClear { background:#ff4d4d; color:#fff; cursor:pointer; }
 #voteClear:disabled { background:#999; cursor:not-allowed; }
 
-#minimizeBtn {
-  background:#888; color:#fff; cursor:pointer; padding:6px 10px; border-radius:8px;
-}
+#minimizeBtn { background:#888; color:#fff; cursor:pointer; padding:6px 10px; border-radius:8px; }
 </style>
 </head>
 <body>
@@ -64,10 +62,11 @@ let drawing = false;
 let drawStarted = false;
 let color = "#FF0000";
 let brushSize = 4;
+let prevX = null, prevY = null;
 let zoneIndex = 0;
 let zoneWidth = 0.225;
 
-// --- Username input
+// Username input
 const nameInput = document.getElementById("nameInput");
 nameInput.addEventListener("change", e=>{
   const name = e.target.value.trim();
@@ -77,33 +76,33 @@ nameInput.addEventListener("change", e=>{
   }
 });
 
-// --- Photoshop-style color picker
+// Photoshop-style color picker
 const colors = ["#FF0000","#FF7F00","#FFFF00","#00FF00","#00FFFF","#0000FF","#8B00FF","#FFFFFF","#000000","#C0C0C0"];
 const colorPicker = document.getElementById("colorPicker");
 colors.forEach(c=>{
   const btn = document.createElement("div");
   btn.classList.add("color-btn");
   btn.style.background=c;
-  btn.addEventListener("click", ()=>{ 
+  btn.addEventListener("click", ()=>{
     document.querySelectorAll(".color-btn").forEach(b=>b.classList.remove("selected"));
     btn.classList.add("selected");
-    color=c;
+    color = c;
   });
   colorPicker.appendChild(btn);
 });
 colorPicker.firstChild.classList.add("selected");
 
-// --- Brush size
+// Brush size
 document.getElementById("brushSize").addEventListener("input", e=>brushSize=e.target.value);
 
-// --- Vote to clear
+// Vote to clear
 const voteClearBtn = document.getElementById("voteClear");
 voteClearBtn.addEventListener("click", ()=>{
   socket.emit("voteClear", username);
   voteClearBtn.disabled = true;
 });
 
-// --- Minimize/Expand UI
+// Minimize/Expand UI
 const controlsDiv = document.getElementById("controls");
 const minimizeBtn = document.getElementById("minimizeBtn");
 let minimized = false;
@@ -115,18 +114,18 @@ minimizeBtn.addEventListener("click", ()=>{
     });
     minimizeBtn.textContent = "+";
   } else {
-    Array.from(controlsDiv.children).forEach(c=>{ c.style.display="flex"; });
+    Array.from(controlsDiv.children).forEach(c=>c.style.display="flex");
     minimizeBtn.textContent = "−";
   }
 });
 
-// --- Assigned zone
+// Zone assignment
 socket.on("zoneAssigned", data=>{
   zoneIndex = data.index;
   zoneWidth = data.width;
 });
 
-// --- Draw guide
+// Draw guide
 function drawZoneGuide(){
   guideCtx.clearRect(0,0,guideCanvas.width, guideCanvas.height);
   const zoneStartX = zoneIndex * drawCanvas.width * zoneWidth;
@@ -154,15 +153,8 @@ function drawZoneGuide(){
 }
 setInterval(drawZoneGuide, 100);
 
-// --- Drawing
-let prevX = null, prevY = null;
-
-function startDraw(e){ 
-  if(username==="") return; 
-  drawing=true; 
-  drawStarted=true; 
-  prevX=null; prevY=null; // reset prev coords
-}
+// Drawing
+function startDraw(e){ if(username==="") return; drawing=true; drawStarted=true; prevX=null; prevY=null; }
 function stopDraw(){ drawing=false; prevX=null; prevY=null; }
 
 drawCanvas.addEventListener("mousedown", startDraw);
@@ -184,11 +176,8 @@ function draw(e){
   x = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
   y = Math.max(0, Math.min(y, zoneSize));
 
-  const normX = (x - zoneStartX)/zoneSize;
-  const normY = y/zoneSize;
-
   if(prevX!==null && prevY!==null){
-    socket.emit("draw", { user:username, color, size:brushSize, normX, normY, zoneIndex });
+    socket.emit("draw", { user:username, color, size:brushSize, prevX, prevY, x, y, zoneIndex });
 
     drawCtx.beginPath();
     drawCtx.moveTo(prevX, prevY);
@@ -204,7 +193,6 @@ function draw(e){
   prevY = y;
 }
 
-// --- Clear
 socket.on("clearCanvas", ()=>{
   drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   drawStarted=false;
