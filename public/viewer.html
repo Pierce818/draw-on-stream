@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Draw on Stream</title>
 <style>
 * { box-sizing: border-box; }
@@ -13,12 +13,20 @@ html, body {
   background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.035) 1px, transparent 0);
   background-size: 28px 28px;
   user-select: none; -webkit-user-select: none;
+  touch-action: none;
 }
 
-canvas { position: absolute; top: 0; left: 0; touch-action: none; }
-#drawingCanvas { z-index: 1; width: 100%; height: 100%; }
-#guideCanvas   { z-index: 2; pointer-events: none; width: 100%; height: 100%; }
-#cursorCanvas  { z-index: 3; pointer-events: none; width: 100%; height: 100%; cursor: none; }
+/* ── Canvas layers ── */
+#canvasWrapper {
+  position: absolute; top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  transform-origin: 0 0;
+  touch-action: none;
+}
+#drawingCanvas { position: absolute; top: 0; left: 0; z-index: 1; touch-action: none; cursor: none; }
+#guideCanvas   { position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; }
+/* Cursor canvas is fixed (screen space, unaffected by zoom) */
+#cursorCanvas  { position: fixed; top: 0; left: 0; z-index: 3; pointer-events: none; }
 
 /* ── Panel ── */
 #controls {
@@ -35,22 +43,20 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 #controls.minimized > *:not(.ctrl-header) { display: none !important; }
 #controls.minimized { padding: 10px 14px; width: auto; min-width: 0; }
 
-/* header */
-.ctrl-header { display: flex; align-items: center; gap: 10px; }
+.ctrl-header { display: flex; align-items: center; gap: 8px; }
 .ctrl-title {
   flex: 1; font-size: 11px; font-weight: 700; letter-spacing: 1.1px;
   text-transform: uppercase; color: #7070a0;
 }
-#minimizeBtn {
+.ctrl-icon-btn {
   background: rgba(255,255,255,0.07); color: #888; border: none;
   border-radius: 8px; width: 28px; height: 28px;
-  cursor: pointer; font-size: 18px; line-height: 1;
+  cursor: pointer; font-size: 14px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.18s; flex-shrink: 0;
 }
-#minimizeBtn:hover { background: rgba(255,255,255,0.14); color: #ccc; }
+.ctrl-icon-btn:hover { background: rgba(255,255,255,0.14); color: #ccc; }
 
-/* divider */
 .ctrl-divider { height: 1px; background: rgba(255,255,255,0.07); }
 
 /* username */
@@ -75,11 +81,9 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
   display: none; align-items: center; gap: 8px;
   background: rgba(255,255,255,0.06); border-radius: 10px; padding: 7px 12px;
 }
-#userDot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+#userDot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 #userNameDisplay { font-size: 13px; font-weight: 700; color: #fff; flex: 1; }
-#changeNameBtn {
-  font-size: 11px; color: rgba(255,255,255,0.3); cursor: pointer; transition: color 0.15s;
-}
+#changeNameBtn { font-size: 11px; color: rgba(255,255,255,0.3); cursor: pointer; transition: color 0.15s; }
 #changeNameBtn:hover { color: rgba(255,255,255,0.6); }
 
 /* color picker */
@@ -93,27 +97,21 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .color-btn.selected { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
 #eraserBtn {
   width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
-  background: rgba(255,255,255,0.08);
-  border: 2px dashed rgba(255,255,255,0.28);
+  background: rgba(255,255,255,0.08); border: 2px dashed rgba(255,255,255,0.28);
   color: rgba(255,255,255,0.45); font-size: 13px;
   display: flex; align-items: center; justify-content: center;
-  transition: transform 0.12s, border-color 0.12s, background 0.12s;
-  flex-shrink: 0;
+  transition: transform 0.12s, border-color 0.12s, background 0.12s; flex-shrink: 0;
 }
 #eraserBtn:hover { transform: scale(1.2); }
 #eraserBtn.selected { border-color: #fff; border-style: solid; background: rgba(255,255,255,0.18); color: #fff; }
 
 /* brush */
 .brush-row { display: flex; align-items: center; gap: 10px; }
-#brushPreviewWrap {
-  width: 32px; height: 32px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-}
+#brushPreviewWrap { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 #brushPreviewCircle { border-radius: 50%; transition: all 0.15s; }
 #brushSize {
   flex: 1; -webkit-appearance: none; appearance: none;
-  height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12);
-  outline: none; cursor: pointer;
+  height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); outline: none; cursor: pointer;
 }
 #brushSize::-webkit-slider-thumb {
   -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
@@ -125,17 +123,13 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 }
 #brushSizeLabel { font-size: 12px; color: #666; min-width: 30px; text-align: right; }
 
-/* online users */
+/* users */
 .users-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 22px; }
 #onlineCount { font-size: 11px; color: #555; white-space: nowrap; margin-right: 2px; }
-.user-pip {
-  display: flex; align-items: center; gap: 5px;
-  background: rgba(255,255,255,0.07); border-radius: 6px; padding: 3px 8px;
-  font-size: 12px; color: #aaa;
-}
+.user-pip { display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.07); border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #aaa; }
 .user-pip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
-/* vote button */
+/* vote */
 #voteClear {
   background: rgba(255,55,55,0.14); color: #ff8888;
   border: 1px solid rgba(255,55,55,0.28); border-radius: 10px;
@@ -148,14 +142,17 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 </head>
 <body>
 
-<canvas id="drawingCanvas"></canvas>
-<canvas id="guideCanvas"></canvas>
+<div id="canvasWrapper">
+  <canvas id="drawingCanvas"></canvas>
+  <canvas id="guideCanvas"></canvas>
+</div>
 <canvas id="cursorCanvas"></canvas>
 
 <div id="controls">
   <div class="ctrl-header">
     <span class="ctrl-title">Draw on Stream</span>
-    <button id="minimizeBtn">−</button>
+    <button id="resetViewBtn" class="ctrl-icon-btn" title="Reset zoom (or double-tap canvas)">⊡</button>
+    <button id="minimizeBtn" class="ctrl-icon-btn">−</button>
   </div>
 
   <div id="nameRow">
@@ -169,7 +166,6 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
   </div>
 
   <div class="ctrl-divider"></div>
-
   <div id="colorPicker"></div>
 
   <div class="brush-row">
@@ -193,7 +189,8 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 const socket = io();
 socket.emit("setType", "viewer");
 
-// ── Canvases ────────────────────────────────────────────────────────────────
+// ── Canvases ──────────────────────────────────────────────────────────────────
+const wrapper      = document.getElementById("canvasWrapper");
 const drawCanvas   = document.getElementById("drawingCanvas");
 const drawCtx      = drawCanvas.getContext("2d");
 const guideCanvas  = document.getElementById("guideCanvas");
@@ -202,29 +199,57 @@ const cursorCanvas = document.getElementById("cursorCanvas");
 const cursorCtx    = cursorCanvas.getContext("2d");
 
 function resizeAll() {
-  [drawCanvas, guideCanvas, cursorCanvas].forEach(c => {
-    c.width  = window.innerWidth;
-    c.height = window.innerHeight;
-  });
+  const w = window.innerWidth, h = window.innerHeight;
+  drawCanvas.width   = w; drawCanvas.height   = h;
+  guideCanvas.width  = w; guideCanvas.height  = h;
+  cursorCanvas.width = w; cursorCanvas.height = h;
+  resetView();
 }
 resizeAll();
 window.addEventListener("resize", resizeAll);
 
-// ── State ────────────────────────────────────────────────────────────────────
-let username   = "";
-let myZoneColor = "#888";
-let drawing    = false;
-let drawStarted = false;
-let color      = "#FF4444";
-let isEraser   = false;
-let brushSize  = 6;
-let prevX = null, prevY = null;
-let zoneIndex  = 0;
-let zoneWidth  = 0.225;
-let mouseX = 0, mouseY = 0;
-let onlineUsers = {}; // { name: { zoneIndex, color } }
+// ── View transform (zoom/pan) ─────────────────────────────────────────────────
+let viewScale = 1, viewX = 0, viewY = 0;
+const MIN_SCALE = 1, MAX_SCALE = 8;
 
-// ── Username ─────────────────────────────────────────────────────────────────
+function applyTransform() {
+  wrapper.style.transform = `translate(${viewX}px,${viewY}px) scale(${viewScale})`;
+}
+function clampView() {
+  // Keep canvas covering the full viewport (no blank areas)
+  viewX = Math.max(Math.min(0, window.innerWidth  - drawCanvas.width  * viewScale), Math.min(0, viewX));
+  viewY = Math.max(Math.min(0, window.innerHeight - drawCanvas.height * viewScale), Math.min(0, viewY));
+}
+function resetView() {
+  viewScale = 1; viewX = 0; viewY = 0;
+  applyTransform();
+}
+// Screen → canvas coordinate conversion
+function toCanvas(sx, sy) {
+  return { x: (sx - viewX) / viewScale, y: (sy - viewY) / viewScale };
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let username    = "";
+let myZoneColor = "#888";
+let drawing     = false;
+let drawStarted = false;
+let color       = "#FF4444";
+let isEraser    = false;
+let brushSize   = 6;
+let prevX = null, prevY = null;
+let zoneIndex   = 0;
+let zoneWidth   = 0.225;
+let mouseX = 0, mouseY = 0;
+let onlineUsers = {};
+
+// Pinch state
+let pinching      = false;
+let lastPinchDist = 0;
+let lastPinchMidX = 0, lastPinchMidY = 0;
+let lastTapTime   = 0;
+
+// ── Username ──────────────────────────────────────────────────────────────────
 const nameInput       = document.getElementById("nameInput");
 const setNameBtn      = document.getElementById("setNameBtn");
 const nameRow         = document.getElementById("nameRow");
@@ -238,14 +263,11 @@ function applyUsername(name) {
   socket.emit("setUsername", username);
   nameRow.style.display = "none";
   userDot.style.background = myZoneColor;
-  userDot.style.color = myZoneColor;
   userNameDisplay.textContent = username;
   userBadge.style.display = "flex";
 }
-
 setNameBtn.addEventListener("click", () => applyUsername(nameInput.value.trim()));
 nameInput.addEventListener("keydown", e => { if (e.key === "Enter") applyUsername(nameInput.value.trim()); });
-
 document.getElementById("changeNameBtn").addEventListener("click", () => {
   username = "";
   userBadge.style.display = "none";
@@ -254,13 +276,9 @@ document.getElementById("changeNameBtn").addEventListener("click", () => {
   nameInput.focus();
 });
 
-// ── Color picker ─────────────────────────────────────────────────────────────
-const colorList = [
-  "#FF4444","#FF8800","#FFE000","#44DD55","#00DDDD",
-  "#4488FF","#AA44FF","#FF44AA","#FFFFFF","#333333"
-];
+// ── Colors ────────────────────────────────────────────────────────────────────
+const colorList = ["#FF4444","#FF8800","#FFE000","#44DD55","#00DDDD","#4488FF","#AA44FF","#FF44AA","#FFFFFF","#333333"];
 const colorPicker = document.getElementById("colorPicker");
-
 colorList.forEach(c => {
   const btn = document.createElement("div");
   btn.className = "color-btn";
@@ -272,25 +290,18 @@ colorList.forEach(c => {
 colorPicker.firstChild.classList.add("selected");
 color = colorList[0];
 
-const eraserBtn = document.getElementById("eraserBtn") || (() => {
-  const b = document.createElement("div");
-  b.id = "eraserBtn";
-  b.title = "Eraser";
-  b.textContent = "✕";
-  colorPicker.appendChild(b);
-  return b;
-})();
-eraserBtn.addEventListener("click", () => selectEraser());
+const eraserBtn = document.createElement("div");
+eraserBtn.id = "eraserBtn"; eraserBtn.title = "Eraser"; eraserBtn.textContent = "✕";
+eraserBtn.addEventListener("click", selectEraser);
+colorPicker.appendChild(eraserBtn);
 
 function selectColor(c, btn) {
   document.querySelectorAll(".color-btn").forEach(b => b.classList.remove("selected"));
   eraserBtn.classList.remove("selected");
   if (btn) btn.classList.add("selected");
-  color = c;
-  isEraser = false;
+  color = c; isEraser = false;
   updateBrushPreview();
 }
-
 function selectEraser() {
   document.querySelectorAll(".color-btn").forEach(b => b.classList.remove("selected"));
   eraserBtn.classList.add("selected");
@@ -298,25 +309,18 @@ function selectEraser() {
   updateBrushPreview();
 }
 
-// ── Brush preview ─────────────────────────────────────────────────────────────
+// ── Brush ─────────────────────────────────────────────────────────────────────
 const brushPreviewCircle = document.getElementById("brushPreviewCircle");
 const brushSizeInput     = document.getElementById("brushSize");
 const brushSizeLabel     = document.getElementById("brushSizeLabel");
 
 function updateBrushPreview() {
   const sz = Math.min(brushSize, 30);
-  brushPreviewCircle.style.width  = sz + "px";
-  brushPreviewCircle.style.height = sz + "px";
-  brushPreviewCircle.style.background = isEraser
-    ? "rgba(255,255,255,0.15)"
-    : color;
-  if (isEraser) {
-    brushPreviewCircle.style.border = "2px dashed rgba(255,255,255,0.4)";
-  } else {
-    brushPreviewCircle.style.border = "none";
-  }
+  brushPreviewCircle.style.width      = sz + "px";
+  brushPreviewCircle.style.height     = sz + "px";
+  brushPreviewCircle.style.background = isEraser ? "rgba(255,255,255,0.15)" : color;
+  brushPreviewCircle.style.border     = isEraser ? "2px dashed rgba(255,255,255,0.4)" : "none";
 }
-
 brushSizeInput.addEventListener("input", e => {
   brushSize = parseInt(e.target.value);
   brushSizeLabel.textContent = brushSize + "px";
@@ -324,7 +328,7 @@ brushSizeInput.addEventListener("input", e => {
 });
 updateBrushPreview();
 
-// ── Minimize ──────────────────────────────────────────────────────────────────
+// ── Controls ──────────────────────────────────────────────────────────────────
 const controlsDiv = document.getElementById("controls");
 const minimizeBtn = document.getElementById("minimizeBtn");
 let minimized = false;
@@ -333,8 +337,8 @@ minimizeBtn.addEventListener("click", () => {
   controlsDiv.classList.toggle("minimized", minimized);
   minimizeBtn.textContent = minimized ? "+" : "−";
 });
+document.getElementById("resetViewBtn").addEventListener("click", resetView);
 
-// ── Vote to clear ─────────────────────────────────────────────────────────────
 const voteClearBtn = document.getElementById("voteClear");
 voteClearBtn.addEventListener("click", () => {
   socket.emit("voteClear");
@@ -343,33 +347,24 @@ voteClearBtn.addEventListener("click", () => {
 
 // ── Socket events ─────────────────────────────────────────────────────────────
 socket.on("zoneAssigned", data => {
-  zoneIndex  = data.index;
-  zoneWidth  = data.width;
+  zoneIndex   = data.index;
+  zoneWidth   = data.width;
   myZoneColor = data.color;
   userDot.style.background = myZoneColor;
-  userDot.style.color = myZoneColor;
 });
-
 socket.on("userList", list => {
   list.forEach(u => { onlineUsers[u.user] = { zoneIndex: u.zoneIndex, color: u.color }; });
   renderUsersList();
 });
-
 socket.on("userUpdate", data => {
   onlineUsers[data.user] = { zoneIndex: data.zoneIndex, color: data.color };
   renderUsersList();
 });
-
 socket.on("userLeft", data => {
   delete onlineUsers[data.user];
   renderUsersList();
 });
-
-// Draw strokes from other users
-socket.on("draw", data => {
-  applyDrawData(drawCtx, data);
-});
-
+socket.on("draw", data => applyDrawData(drawCtx, data));
 socket.on("clearCanvas", () => {
   drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
   drawStarted = false;
@@ -379,29 +374,20 @@ socket.on("clearCanvas", () => {
 function applyDrawData(ctx, data) {
   if (data.isEraser) {
     ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    ctx.moveTo(data.prevX, data.prevY);
-    ctx.lineTo(data.x, data.y);
-    ctx.lineWidth = data.size;
-    ctx.lineCap = "round";
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(data.prevX, data.prevY); ctx.lineTo(data.x, data.y);
+    ctx.lineWidth = data.size; ctx.lineCap = "round"; ctx.stroke();
     ctx.globalCompositeOperation = "source-over";
   } else {
-    ctx.beginPath();
-    ctx.moveTo(data.prevX, data.prevY);
-    ctx.lineTo(data.x, data.y);
-    ctx.strokeStyle = data.color;
-    ctx.lineWidth = data.size;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.closePath();
+    ctx.beginPath(); ctx.moveTo(data.prevX, data.prevY); ctx.lineTo(data.x, data.y);
+    ctx.strokeStyle = data.color; ctx.lineWidth = data.size; ctx.lineCap = "round";
+    ctx.stroke(); ctx.closePath();
   }
 }
 
-// ── Online users list ─────────────────────────────────────────────────────────
+// ── Online users ──────────────────────────────────────────────────────────────
 function renderUsersList() {
-  const list  = document.getElementById("usersList");
-  const count = document.getElementById("onlineCount");
+  const list    = document.getElementById("usersList");
+  const count   = document.getElementById("onlineCount");
   list.innerHTML = "";
   const entries = Object.entries(onlineUsers);
   count.textContent = entries.length + " online";
@@ -425,30 +411,22 @@ function drawZoneGuide() {
   const startX   = zoneIndex * drawCanvas.width * zoneWidth;
   const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height * 0.5);
 
-  // Subtle fill
   guideCtx.fillStyle = "rgba(255,255,255,0.025)";
   guideCtx.fillRect(startX, 0, zoneSize, zoneSize);
 
-  // Dashed border using zone color
   guideCtx.strokeStyle = myZoneColor + "90";
-  guideCtx.lineWidth   = 1.5;
+  guideCtx.lineWidth = 1.5;
   guideCtx.setLineDash([8, 5]);
   guideCtx.strokeRect(startX + 1, 1, zoneSize - 2, zoneSize - 2);
   guideCtx.setLineDash([]);
 
-  // Corner accent lines
-  const accentLen = 16;
+  const a = 16;
   guideCtx.strokeStyle = myZoneColor;
-  guideCtx.lineWidth   = 3;
-  [
-    [startX, 0, startX + accentLen, 0],
-    [startX, 0, startX, accentLen],
-    [startX + zoneSize, 0, startX + zoneSize - accentLen, 0],
-    [startX + zoneSize, 0, startX + zoneSize, accentLen],
-    [startX, zoneSize, startX + accentLen, zoneSize],
-    [startX, zoneSize, startX, zoneSize - accentLen],
-    [startX + zoneSize, zoneSize, startX + zoneSize - accentLen, zoneSize],
-    [startX + zoneSize, zoneSize, startX + zoneSize, zoneSize - accentLen],
+  guideCtx.lineWidth = 3;
+  [[startX,0,startX+a,0],[startX,0,startX,a],
+   [startX+zoneSize,0,startX+zoneSize-a,0],[startX+zoneSize,0,startX+zoneSize,a],
+   [startX,zoneSize,startX+a,zoneSize],[startX,zoneSize,startX,zoneSize-a],
+   [startX+zoneSize,zoneSize,startX+zoneSize-a,zoneSize],[startX+zoneSize,zoneSize,startX+zoneSize,zoneSize-a]
   ].forEach(([x1,y1,x2,y2]) => {
     guideCtx.beginPath(); guideCtx.moveTo(x1,y1); guideCtx.lineTo(x2,y2); guideCtx.stroke();
   });
@@ -459,7 +437,6 @@ function drawZoneGuide() {
     guideCtx.textAlign = "center";
     guideCtx.fillText("Draw here!", startX + zoneSize / 2, zoneSize / 2);
   }
-
   if (!username) {
     guideCtx.font = "bold 14px -apple-system, sans-serif";
     guideCtx.fillStyle = "rgba(255,220,100,0.85)";
@@ -469,17 +446,15 @@ function drawZoneGuide() {
 }
 setInterval(drawZoneGuide, 120);
 
-// ── Cursor preview ────────────────────────────────────────────────────────────
+// ── Cursor preview (screen-space, scales with zoom) ───────────────────────────
 function drawCustomCursor() {
   cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
-  const r = brushSize / 2;
-
+  const r = Math.max(1, (brushSize * viewScale) / 2);
   cursorCtx.beginPath();
-  cursorCtx.arc(mouseX, mouseY, Math.max(r, 1), 0, Math.PI * 2);
-
+  cursorCtx.arc(mouseX, mouseY, r, 0, Math.PI * 2);
   if (isEraser) {
-    cursorCtx.strokeStyle = "rgba(255,255,255,0.7)";
-    cursorCtx.lineWidth   = 1.5;
+    cursorCtx.strokeStyle = "rgba(255,255,255,0.75)";
+    cursorCtx.lineWidth = 1.5;
     cursorCtx.stroke();
   } else {
     cursorCtx.fillStyle   = color + "55";
@@ -488,49 +463,49 @@ function drawCustomCursor() {
     cursorCtx.fill();
     cursorCtx.stroke();
   }
-
-  // Center dot
   cursorCtx.beginPath();
   cursorCtx.arc(mouseX, mouseY, 1.5, 0, Math.PI * 2);
   cursorCtx.fillStyle = "rgba(255,255,255,0.9)";
   cursorCtx.fill();
 }
-
 drawCanvas.addEventListener("mousemove", e => { mouseX = e.clientX; mouseY = e.clientY; drawCustomCursor(); });
-drawCanvas.addEventListener("mouseleave", () => cursorCtx.clearRect(0,0,cursorCanvas.width,cursorCanvas.height));
-drawCanvas.style.cursor = "none";
+drawCanvas.addEventListener("mouseleave", () => cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height));
 
-// ── Drawing ───────────────────────────────────────────────────────────────────
+// ── Mouse wheel zoom ──────────────────────────────────────────────────────────
+drawCanvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const factor   = e.deltaY < 0 ? 1.1 : 0.9;
+  const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, viewScale * factor));
+  viewX  = e.clientX - (e.clientX - viewX) * (newScale / viewScale);
+  viewY  = e.clientY - (e.clientY - viewY) * (newScale / viewScale);
+  viewScale = newScale;
+  clampView();
+  applyTransform();
+}, { passive: false });
+
+// ── Drawing helpers ───────────────────────────────────────────────────────────
 function getPos(e) {
-  if (e.touches) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
   return { x: e.clientX, y: e.clientY };
 }
-
 function startDraw(e) {
   if (!username) return;
-  drawing = true;
-  drawStarted = true;
-  const p = getPos(e);
-  prevX = p.x; prevY = p.y;
+  drawing = true; drawStarted = true;
+  const c = toCanvas(getPos(e).x, getPos(e).y);
+  prevX = c.x; prevY = c.y;
 }
 function stopDraw() { drawing = false; prevX = null; prevY = null; }
 
-drawCanvas.addEventListener("mousedown", startDraw);
-drawCanvas.addEventListener("mouseup",   stopDraw);
-drawCanvas.addEventListener("mouseleave", stopDraw);
-drawCanvas.addEventListener("touchstart", e => { e.preventDefault(); startDraw(e); }, { passive: false });
-drawCanvas.addEventListener("touchend",  stopDraw);
-drawCanvas.addEventListener("touchmove", e => { e.preventDefault(); handleDraw(e); }, { passive: false });
-drawCanvas.addEventListener("mousemove", handleDraw);
-
 function handleDraw(e) {
-  mouseX = getPos(e).x; mouseY = getPos(e).y;
+  const p = getPos(e);
+  mouseX = p.x; mouseY = p.y;
   drawCustomCursor();
   if (!drawing || !username) return;
 
-  const p = getPos(e);
-  let x = p.x, y = p.y;
+  const c = toCanvas(p.x, p.y);
+  let x = c.x, y = c.y;
 
+  // Zone constraint (canvas-space)
   const startX   = zoneIndex * drawCanvas.width * zoneWidth;
   const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height * 0.5);
   x = Math.max(startX, Math.min(x, startX + zoneSize));
@@ -541,9 +516,82 @@ function handleDraw(e) {
     applyDrawData(drawCtx, data);
     socket.emit("draw", data);
   }
-
   prevX = x; prevY = y;
 }
+
+// ── Mouse events ──────────────────────────────────────────────────────────────
+drawCanvas.addEventListener("mousedown",  startDraw);
+drawCanvas.addEventListener("mouseup",    stopDraw);
+drawCanvas.addEventListener("mouseleave", stopDraw);
+drawCanvas.addEventListener("mousemove",  handleDraw);
+
+// ── Touch events ──────────────────────────────────────────────────────────────
+drawCanvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    // Double-tap to reset zoom
+    const now = Date.now();
+    if (now - lastTapTime < 280) { resetView(); lastTapTime = 0; return; }
+    lastTapTime = now;
+
+    if (!pinching) startDraw(e);
+  } else if (e.touches.length === 2) {
+    stopDraw();
+    pinching = true;
+    lastPinchDist = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY
+    );
+    lastPinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    lastPinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+  }
+}, { passive: false });
+
+drawCanvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && !pinching) {
+    handleDraw(e);
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY
+    );
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, viewScale * (dist / lastPinchDist)));
+    // Zoom toward pinch midpoint
+    viewX = midX - (midX - viewX) * (newScale / viewScale);
+    viewY = midY - (midY - viewY) * (newScale / viewScale);
+    viewScale = newScale;
+    // Pan with midpoint movement
+    viewX += midX - lastPinchMidX;
+    viewY += midY - lastPinchMidY;
+
+    clampView();
+    applyTransform();
+
+    lastPinchDist = dist;
+    lastPinchMidX = midX;
+    lastPinchMidY = midY;
+  }
+}, { passive: false });
+
+drawCanvas.addEventListener("touchend", e => {
+  if (e.touches.length === 0) {
+    stopDraw();
+    pinching = false;
+  } else if (e.touches.length === 1 && pinching) {
+    // One finger remains after pinch — don't accidentally start a stroke
+    pinching = false;
+    stopDraw();
+  }
+});
+
+drawCanvas.addEventListener("touchcancel", () => {
+  stopDraw();
+  pinching = false;
+});
 </script>
 </body>
 </html>

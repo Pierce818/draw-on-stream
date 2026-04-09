@@ -8,14 +8,21 @@ html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
 canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 #drawingCanvas { z-index: 1; }
 
-.username-label {
-  position: absolute; z-index: 2; pointer-events: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 13px; font-weight: 800;
-  padding: 3px 10px 4px; border-radius: 6px;
-  white-space: nowrap; letter-spacing: 0.3px;
+.zone-label {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Arial Black', sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  padding: 5px 16px 6px;
+  border-radius: 24px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.45);
+  box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+  transform: translateX(-50%);
   transition: opacity 0.3s;
 }
 </style>
@@ -36,27 +43,35 @@ drawCanvas.height = window.innerHeight;
 const zoneWidth = 0.225;
 let users = {}; // { name: { zoneIndex, color, labelEl } }
 
-function ensureLabel(name, color) {
-  if (!users[name]) return;
-  if (users[name].labelEl) return;
+function createLabel(name, color, zoneIndex) {
+  const zoneW   = drawCanvas.width * zoneWidth;
+  const centerX = zoneIndex * zoneW + zoneW / 2;
+
   const el = document.createElement("div");
-  el.className = "username-label";
+  el.className = "zone-label";
   el.textContent = name;
-  el.style.background = color + "cc";
-  el.style.borderBottom = `2px solid ${color}`;
+  el.style.background  = color + "d0"; // ~82% opacity
+  el.style.left        = centerX + "px";
+  el.style.top         = "12px";
   document.body.appendChild(el);
-  users[name].labelEl = el;
+  return el;
 }
 
-function updateLabels() {
-  Object.entries(users).forEach(([name, info]) => {
-    ensureLabel(name, info.color);
-    const label = info.labelEl;
-    if (!label) return;
-    const x = info.zoneIndex * drawCanvas.width * zoneWidth + 8;
-    label.style.left = x + "px";
-    label.style.top  = "8px";
-  });
+function ensureLabel(name) {
+  const info = users[name];
+  if (!info || info.labelEl) return;
+  info.labelEl = createLabel(name, info.color, info.zoneIndex);
+}
+
+function updateAllLabels() {
+  Object.keys(users).forEach(ensureLabel);
+}
+
+function removeLabel(name) {
+  if (users[name] && users[name].labelEl) {
+    users[name].labelEl.remove();
+    users[name].labelEl = null;
+  }
 }
 
 function applyDrawData(data) {
@@ -87,21 +102,18 @@ socket.on("userList", list => {
   list.forEach(u => {
     users[u.user] = { zoneIndex: u.zoneIndex, color: u.color, labelEl: null };
   });
-  updateLabels();
+  updateAllLabels();
 });
 
 socket.on("userUpdate", data => {
-  if (!users[data.user]) users[data.user] = { labelEl: null };
-  users[data.user].zoneIndex = data.zoneIndex;
-  users[data.user].color     = data.color;
-  updateLabels();
+  removeLabel(data.user); // remove old label if it exists (handles color/zone change)
+  users[data.user] = { zoneIndex: data.zoneIndex, color: data.color, labelEl: null };
+  ensureLabel(data.user);
 });
 
 socket.on("userLeft", data => {
-  if (users[data.user]) {
-    if (users[data.user].labelEl) users[data.user].labelEl.remove();
-    delete users[data.user];
-  }
+  removeLabel(data.user);
+  delete users[data.user];
 });
 
 socket.on("clearCanvas", () => {
