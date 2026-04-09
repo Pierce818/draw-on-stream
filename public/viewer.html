@@ -78,7 +78,6 @@ nameInput.addEventListener("change", e=>{
 // --- Photoshop-style color picker
 const colors = ["#FF0000","#FF7F00","#FFFF00","#00FF00","#00FFFF","#0000FF","#8B00FF","#FFFFFF","#000000","#C0C0C0"];
 const colorPicker = document.getElementById("colorPicker");
-
 colors.forEach(c=>{
   const btn = document.createElement("div");
   btn.classList.add("color-btn");
@@ -114,9 +113,7 @@ minimizeBtn.addEventListener("click", ()=>{
     });
     minimizeBtn.textContent = "+";
   } else {
-    Array.from(controlsDiv.children).forEach(c=>{
-      c.style.display="flex";
-    });
+    Array.from(controlsDiv.children).forEach(c=> c.style.display="flex");
     minimizeBtn.textContent = "−";
   }
 });
@@ -156,8 +153,19 @@ function drawZoneGuide(){
 setInterval(drawZoneGuide, 100);
 
 // --- Drawing
-function startDraw(e){ if(username==="") return; drawing=true; drawStarted=true; }
-function stopDraw(){ drawing=false; prevX=null; prevY=null; }
+function startDraw(e){
+  if(username==="") return;
+  drawing=true;
+  drawStarted=true;
+  prevX=null; prevY=null;
+  socket.emit("startDraw", username); // NEW: overlay resets lastStroke
+}
+function stopDraw(){
+  drawing=false;
+  prevX=null;
+  prevY=null;
+  socket.emit("stopDraw", username);
+}
 
 drawCanvas.addEventListener("mousedown", startDraw);
 drawCanvas.addEventListener("mouseup", stopDraw);
@@ -197,7 +205,6 @@ function draw(e){
   prevX = x;
   prevY = y;
 }
-
 socket.on("clearCanvas", ()=>{
   drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   drawStarted=false;

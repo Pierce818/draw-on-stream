@@ -18,59 +18,64 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Store last stroke per user
+// Keep track of each user
 const users = {};
 
-// Draw event from viewer
-socket.on("draw", data => {
-    const zoneWidth = Math.min(canvas.width * 0.225, canvas.height * 0.5);
-    const zoneStartX = data.zoneIndex * canvas.width * 0.225;
-    const zoneSize = Math.min(canvas.width * 0.225, canvas.height * 0.5);
+socket.on("draw", data=>{
+  const zoneWidth = Math.min(canvas.width * 0.225, canvas.height*0.5);
+  const zoneStartX = data.zoneIndex * canvas.width * 0.225;
+  const zoneSize = Math.min(canvas.width * 0.225, canvas.height*0.5);
+  const x = zoneStartX + data.normX * zoneSize;
+  const y = data.normY * zoneSize;
 
-    const x = zoneStartX + data.normX * zoneSize;
-    const y = data.normY * zoneSize;
+  if(users[data.user]?.drawing && users[data.user].lastStroke){
+    const last = users[data.user].lastStroke;
+    ctx.beginPath();
+    ctx.moveTo(last.x,last.y);
+    ctx.lineTo(x,y);
+    ctx.strokeStyle=data.color;
+    ctx.lineWidth=data.size;
+    ctx.lineCap="round";
+    ctx.stroke();
+    ctx.closePath();
+  }
 
-    if(users[data.user]?.drawing && users[data.user].lastStroke){
-        const last = users[data.user].lastStroke;
-        ctx.beginPath();
-        ctx.moveTo(last.x, last.y);
-        ctx.lineTo(x, y);
-        ctx.strokeStyle = data.color;
-        ctx.lineWidth = data.size;
-        ctx.lineCap = "round";
-        ctx.stroke();
-        ctx.closePath();
-    }
+  users[data.user] = {
+    ...users[data.user],
+    lastStroke: {x,y},
+    drawing:true,
+    username:data.user,
+    zoneIndex:data.zoneIndex,
+    color:data.color
+  };
 
-    // Update stroke info
-    users[data.user] = {
-        ...users[data.user],
-        lastStroke: {x, y},
-        drawing: true,
-        username: data.user,
-        zoneIndex: data.zoneIndex,
-        color: data.color
-    };
-
-    // Draw username above zone
-    ctx.font = "16px Arial";
-    ctx.fillStyle = data.color;
-    ctx.textAlign = "center";
-    ctx.fillText(data.user, zoneStartX + zoneSize / 2, zoneSize + 18);
+  // Draw username above zone
+  ctx.font = "16px Arial";
+  ctx.fillStyle = data.color;
+  ctx.textAlign = "center";
+  ctx.fillText(data.user, zoneStartX + zoneSize/2, zoneSize + 18);
 });
 
-// Stop stroke event
-socket.on("stopDraw", username => {
-    if(users[username]){
-        users[username].drawing = false;
-        users[username].lastStroke = null; // important: prevents snapping
-    }
+// NEW: startDraw resets lastStroke
+socket.on("startDraw", username=>{
+  if(users[username]){
+    users[username].lastStroke = null;
+    users[username].drawing = true;
+  }
+});
+
+// stopDraw resets drawing
+socket.on("stopDraw", username=>{
+  if(users[username]){
+    users[username].drawing=false;
+    users[username].lastStroke=null;
+  }
 });
 
 // Clear canvas
-socket.on("clearCanvas", () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for(const u in users) delete users[u];
+socket.on("clearCanvas", ()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(const u in users) delete users[u];
 });
 </script>
 </body>
