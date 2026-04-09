@@ -9,38 +9,17 @@
   #drawingCanvas { z-index:1; }
   #guideCanvas { z-index:2; pointer-events:none; }
 
-  /* Modern UI container */
   #controls {
-    position: fixed;
-    top:12px;
-    left:50%;
-    transform: translateX(-50%);
-    background: rgba(40,40,40,0.9);
-    padding: 14px 20px;
-    border-radius: 16px;
-    display:flex;
-    gap:12px;
-    flex-wrap: wrap;
-    align-items:center;
-    z-index:9999;
-    color:#fff;
-    font-size:14px;
-    box-shadow:0 5px 18px rgba(0,0,0,0.35);
+    position: fixed; top:12px; left:50%; transform: translateX(-50%);
+    background: rgba(40,40,40,0.9); padding: 14px 20px; border-radius:16px;
+    display:flex; gap:12px; flex-wrap: wrap; align-items:center;
+    z-index:9999; color:#fff; font-size:14px; box-shadow:0 5px 18px rgba(0,0,0,0.35);
   }
-
   #controls input, #controls button { border:none; border-radius:8px; padding:6px 10px; font-size:14px; }
   #controls input { width:160px; position:relative; z-index:10000; }
 
-  /* Photoshop-style compact color picker */
-  #colorPicker {
-    display:grid;
-    grid-template-columns: repeat(5, 28px);
-    grid-gap:5px;
-  }
-  .color-btn {
-    width:28px; height:28px; border-radius:6px; cursor:pointer;
-    border:1px solid #fff; transition: all 0.2s;
-  }
+  #colorPicker { display:grid; grid-template-columns: repeat(5, 28px); grid-gap:5px; }
+  .color-btn { width:28px; height:28px; border-radius:6px; cursor:pointer; border:1px solid #fff; transition: all 0.2s; }
   .color-btn:hover { transform: scale(1.2); border-width:2px; }
   .color-btn.selected { border:2px solid #ff0; }
 
@@ -174,8 +153,11 @@ function draw(e){
   x = Math.max(zoneStartX, Math.min(x, zoneStartX + zoneSize));
   y = Math.max(0, Math.min(y, zoneSize));
 
+  const normX = (x - zoneStartX)/zoneSize;
+  const normY = y/zoneSize;
+
   if(prevX!==null && prevY!==null){
-    socket.emit("draw", { x, y, user:username, color, size:brushSize, zoneStartX, zoneSize });
+    socket.emit("draw", { user:username, color, size:brushSize, normX, normY, zoneIndex });
 
     drawCtx.beginPath();
     drawCtx.moveTo(prevX, prevY);

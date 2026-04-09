@@ -1,48 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Overlay</title>
-  <style>
-    html, body { margin:0; padding:0; overflow:hidden; background:transparent; }
-    canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
-  </style>
+<meta charset="UTF-8">
+<title>Draw Overlay</title>
+<style>
+  html, body { margin:0; padding:0; overflow:hidden; background:transparent; }
+  canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
+</style>
 </head>
 <body>
-<canvas id="overlayCanvas"></canvas>
+<canvas id="canvas"></canvas>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const canvas = document.getElementById("overlayCanvas");
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let userData = {};
+// Track last positions per user
+const prev = {};
 
-socket.on("draw", data=>{
-  if(!userData[data.user]){
-    userData[data.user] = {prevX:data.x, prevY:data.y, zoneX:data.zoneStartX, zoneSize:data.zoneSize};
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(userData[data.user].prevX, userData[data.user].prevY);
-    ctx.lineTo(data.x, data.y);
-    ctx.strokeStyle = data.color;
-    ctx.lineWidth = data.size;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.closePath();
-    userData[data.user].prevX = data.x;
-    userData[data.user].prevY = data.y;
-  }
+socket.on("draw", data => {
+  const zoneWidth = 0.225;
+  const zoneSize = Math.min(canvas.width * zoneWidth, canvas.height * 0.5);
+  const zoneStartX = data.zoneIndex * canvas.width * zoneWidth;
 
-  ctx.font = "16px Arial";
-  ctx.fillStyle = "#fff";
-  ctx.fillText(data.user, userData[data.user].zoneX + 5, 20);
+  const x = zoneStartX + data.normX * zoneSize;
+  const y = data.normY * zoneSize;
+
+  const last = prev[data.user] || {x, y};
+  ctx.beginPath();
+  ctx.moveTo(last.x, last.y);
+  ctx.lineTo(x, y);
+  ctx.strokeStyle = data.color;
+  ctx.lineWidth = data.size;
+  ctx.lineCap = "round";
+  ctx.stroke();
+  ctx.closePath();
+
+  prev[data.user] = { x, y };
 });
 
 socket.on("clearCanvas", ()=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  userData = {};
+  for(const k in prev) delete prev[k];
 });
 </script>
 </body>
