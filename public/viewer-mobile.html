@@ -13,22 +13,24 @@ html, body {
   background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.035) 1px, transparent 0);
   background-size: 28px 28px;
   user-select: none; -webkit-user-select: none;
-  /* touch-action NOT set on body — would break controls on iOS */
 }
 
-/* ── Canvas wrapper (zooms/pans) ── */
-#canvasWrapper {
+/* Canvases sit flat in body — zoom handled via JS transform */
+#drawingCanvas {
   position: absolute; top: 0; left: 0;
-  width: 100vw; height: 100vh;
+  z-index: 1;
   transform-origin: 0 0;
-  touch-action: none; /* only block default gestures on the canvas area */
+  touch-action: none;
 }
-#drawingCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-#guideCanvas   { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+#guideCanvas {
+  position: absolute; top: 0; left: 0;
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
 
-/* ── Panel ── */
+/* ── Panel — always fixed, always interactive ── */
 #controls {
-  touch-action: auto; /* ensure taps on controls always work */
   position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
   background: rgba(14, 14, 22, 0.93);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
@@ -38,6 +40,8 @@ html, body {
   z-index: 9999; color: #dde0f0; font-size: 13px;
   width: min(360px, 92vw);
   box-shadow: 0 12px 48px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.05) inset;
+  touch-action: auto;
+  -webkit-tap-highlight-color: transparent;
 }
 #controls.minimized > *:not(.ctrl-header) { display: none !important; }
 #controls.minimized { padding: 10px 14px; width: auto; min-width: 0; }
@@ -46,32 +50,30 @@ html, body {
 .ctrl-title { flex: 1; font-size: 11px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: #7070a0; }
 .ctrl-icon-btn {
   background: rgba(255,255,255,0.07); color: #888; border: none;
-  border-radius: 8px; width: 28px; height: 28px;
+  border-radius: 8px; width: 34px; height: 34px;
   cursor: pointer; font-size: 16px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.18s; flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
-.ctrl-icon-btn:hover { background: rgba(255,255,255,0.14); color: #ccc; }
 .ctrl-hint { font-size: 11px; color: #555; text-align: center; }
-
 .ctrl-divider { height: 1px; background: rgba(255,255,255,0.07); }
 
 #nameRow { display: flex; gap: 8px; align-items: center; }
 #nameInput {
   flex: 1; background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-  padding: 8px 12px; color: #fff; font-size: 13px; outline: none;
-  transition: border-color 0.2s;
+  padding: 10px 12px; color: #fff; font-size: 16px; /* 16px prevents iOS zoom-on-focus */
+  outline: none; transition: border-color 0.2s;
 }
-#nameInput:focus { border-color: rgba(130,180,255,0.5); background: rgba(255,255,255,0.1); }
+#nameInput:focus { border-color: rgba(130,180,255,0.5); }
 #nameInput::placeholder { color: rgba(255,255,255,0.22); }
 #setNameBtn {
   background: rgba(100,160,255,0.18); color: #90b8ff;
   border: 1px solid rgba(100,160,255,0.28); border-radius: 10px;
-  padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 700;
-  white-space: nowrap; transition: background 0.18s;
+  padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 700;
+  white-space: nowrap; -webkit-tap-highlight-color: transparent;
 }
-#setNameBtn:hover { background: rgba(100,160,255,0.33); }
 
 #userBadge {
   display: none; align-items: center; gap: 8px;
@@ -80,33 +82,37 @@ html, body {
 #userDot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 #userNameDisplay { font-size: 13px; font-weight: 700; color: #fff; flex: 1; }
 #changeNameBtn { font-size: 11px; color: rgba(255,255,255,0.3); cursor: pointer; }
-#changeNameBtn:hover { color: rgba(255,255,255,0.6); }
 
-#colorPicker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+/* Color swatches — larger for touch, cursor:pointer required for iOS click events on divs */
+#colorPicker { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .color-btn {
-  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
-  border: 2px solid transparent; transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  width: 34px; height: 34px; border-radius: 8px;
+  cursor: pointer; /* required for iOS Safari to fire click on divs */
+  border: 2px solid transparent;
+  transition: border-color 0.12s, box-shadow 0.12s;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 .color-btn.selected { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
 #eraserBtn {
-  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  width: 34px; height: 34px; border-radius: 8px;
+  cursor: pointer;
   background: rgba(255,255,255,0.08); border: 2px dashed rgba(255,255,255,0.28);
-  color: rgba(255,255,255,0.45); font-size: 14px;
+  color: rgba(255,255,255,0.45); font-size: 15px;
   display: flex; align-items: center; justify-content: center;
-  transition: transform 0.12s, border-color 0.12s, background 0.12s; flex-shrink: 0;
+  flex-shrink: 0; -webkit-tap-highlight-color: transparent;
 }
 #eraserBtn.selected { border-color: #fff; border-style: solid; background: rgba(255,255,255,0.18); color: #fff; }
 
 .brush-row { display: flex; align-items: center; gap: 10px; }
-#brushPreviewWrap { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+#brushPreviewWrap { width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 #brushPreviewCircle { border-radius: 50%; transition: all 0.15s; }
 #brushSize {
   flex: 1; -webkit-appearance: none; appearance: none;
   height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); outline: none;
 }
 #brushSize::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%;
   background: #c0c0e0; box-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 #brushSizeLabel { font-size: 12px; color: #666; min-width: 30px; text-align: right; }
@@ -119,19 +125,16 @@ html, body {
 #voteClear {
   background: rgba(255,55,55,0.14); color: #ff8888;
   border: 1px solid rgba(255,55,55,0.28); border-radius: 10px;
-  padding: 11px; cursor: pointer; font-size: 13px; font-weight: 700;
-  transition: background 0.18s; text-align: center; width: 100%;
+  padding: 12px; cursor: pointer; font-size: 13px; font-weight: 700;
+  text-align: center; width: 100%; -webkit-tap-highlight-color: transparent;
 }
-#voteClear:hover:not(:disabled) { background: rgba(255,55,55,0.28); }
-#voteClear:disabled { opacity: 0.3; cursor: not-allowed; }
+#voteClear:disabled { opacity: 0.3; }
 </style>
 </head>
 <body>
 
-<div id="canvasWrapper">
-  <canvas id="drawingCanvas"></canvas>
-  <canvas id="guideCanvas"></canvas>
-</div>
+<canvas id="drawingCanvas"></canvas>
+<canvas id="guideCanvas"></canvas>
 
 <div id="controls">
   <div class="ctrl-header">
@@ -167,7 +170,7 @@ html, body {
   </div>
 
   <button id="voteClear">Vote to Clear Canvas</button>
-  <p class="ctrl-hint">Pinch to zoom · Double-tap to reset</p>
+  <p class="ctrl-hint">Pinch to zoom · Double-tap canvas to reset</p>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -176,11 +179,11 @@ const socket = io();
 socket.emit("setType", "viewer");
 
 // ── Canvases ──────────────────────────────────────────────────────────────────
-const wrapper     = document.getElementById("canvasWrapper");
 const drawCanvas  = document.getElementById("drawingCanvas");
 const drawCtx     = drawCanvas.getContext("2d");
 const guideCanvas = document.getElementById("guideCanvas");
 const guideCtx    = guideCanvas.getContext("2d");
+const controlsDiv = document.getElementById("controls");
 
 function resizeAll() {
   const w = window.innerWidth, h = window.innerHeight;
@@ -196,7 +199,10 @@ let viewScale = 1, viewX = 0, viewY = 0;
 const MIN_SCALE = 1, MAX_SCALE = 8;
 
 function applyTransform() {
-  wrapper.style.transform = `translate(${viewX}px,${viewY}px) scale(${viewScale})`;
+  // Apply the same CSS transform to both canvases
+  const t = `translate(${viewX}px,${viewY}px) scale(${viewScale})`;
+  drawCanvas.style.transform  = t;
+  guideCanvas.style.transform = t;
 }
 function clampView() {
   viewX = Math.max(Math.min(0, window.innerWidth  - drawCanvas.width  * viewScale), Math.min(0, viewX));
@@ -246,7 +252,7 @@ function applyUsername(name) {
   userBadge.style.display = "flex";
 }
 setNameBtn.addEventListener("click", () => applyUsername(nameInput.value.trim()));
-nameInput.addEventListener("keydown", e => { if (e.key === "Enter") applyUsername(nameInput.value.trim()); });
+nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { nameInput.blur(); applyUsername(nameInput.value.trim()); } });
 document.getElementById("changeNameBtn").addEventListener("click", () => {
   username = "";
   userBadge.style.display = "none";
@@ -307,7 +313,6 @@ brushSizeInput.addEventListener("input", e => {
 updateBrushPreview();
 
 // ── Controls ──────────────────────────────────────────────────────────────────
-const controlsDiv = document.getElementById("controls");
 const minimizeBtn = document.getElementById("minimizeBtn");
 let minimized = false;
 minimizeBtn.addEventListener("click", () => {
@@ -424,12 +429,13 @@ function drawZoneGuide() {
 }
 setInterval(drawZoneGuide, 120);
 
-// ── Touch drawing + pinch zoom ────────────────────────────────────────────────
-// Listeners on wrapper (covers full screen) rather than just the canvas element
-wrapper.addEventListener("touchstart", e => {
+// ── Touch events (on body, skip if target is inside controls) ─────────────────
+document.body.addEventListener("touchstart", e => {
+  // Let the controls panel handle its own touches
+  if (controlsDiv.contains(e.target)) return;
   e.preventDefault();
+
   if (e.touches.length === 1) {
-    // Double-tap resets zoom
     const now = Date.now();
     if (now - lastTapTime < 280) { resetView(); lastTapTime = 0; return; }
     lastTapTime = now;
@@ -451,12 +457,13 @@ wrapper.addEventListener("touchstart", e => {
   }
 }, { passive: false });
 
-wrapper.addEventListener("touchmove", e => {
+document.body.addEventListener("touchmove", e => {
+  if (controlsDiv.contains(e.target)) return;
   e.preventDefault();
+
   if (e.touches.length === 1 && !pinching && drawing && username) {
     const c = toCanvas(e.touches[0].clientX, e.touches[0].clientY);
     let x = c.x, y = c.y;
-
     const startX   = zoneIndex * drawCanvas.width * zoneWidth;
     const zoneSize = Math.min(drawCanvas.width * zoneWidth, drawCanvas.height * 0.5);
     x = Math.max(startX, Math.min(x, startX + zoneSize));
@@ -492,17 +499,15 @@ wrapper.addEventListener("touchmove", e => {
   }
 }, { passive: false });
 
-wrapper.addEventListener("touchend", e => {
+document.body.addEventListener("touchend", e => {
   if (e.touches.length === 0) {
-    drawing = false; prevX = null; prevY = null;
-    pinching = false;
+    drawing = false; prevX = null; prevY = null; pinching = false;
   } else if (e.touches.length === 1 && pinching) {
-    pinching = false;
-    drawing = false; prevX = null; prevY = null;
+    pinching = false; drawing = false; prevX = null; prevY = null;
   }
 });
 
-wrapper.addEventListener("touchcancel", () => {
+document.body.addEventListener("touchcancel", () => {
   drawing = false; prevX = null; prevY = null; pinching = false;
 });
 </script>
