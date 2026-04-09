@@ -18,49 +18,54 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Keep track of each user's last point and drawing state
+// Users object: stores last position, username, drawing state, zone, and color
 const users = {};
 
-// Draw event from viewer
 socket.on("draw", data => {
-  const zoneSize = Math.min(canvas.width * 0.225, canvas.height * 0.5);
-  const zoneStartX = data.zoneIndex * canvas.width * 0.225;
+    const zoneWidth = Math.min(canvas.width * 0.225, canvas.height * 0.5); 
+    const zoneStartX = data.zoneIndex * canvas.width * 0.225;
 
-  const x = zoneStartX + data.normX * zoneSize;
-  const y = data.normY * zoneSize;
+    const x = zoneStartX + data.normX * zoneWidth;
+    const y = data.normY * zoneWidth;
 
-  // Only draw if user is actively drawing
-  if(users[data.user]?.drawing){
-    const last = users[data.user].last;
-    ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = data.color;
-    ctx.lineWidth = data.size;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.closePath();
-  }
+    // Only draw if the user is actively drawing
+    if(users[data.user]?.drawing && users[data.user].last){
+        const last = users[data.user].last;
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = data.color;
+        ctx.lineWidth = data.size;
+        ctx.lineCap = "round";
+        ctx.stroke();
+        ctx.closePath();
+    }
 
-  // Update user state
-  users[data.user] = { last:{x, y}, username: data.user, drawing:true, zoneIndex:data.zoneIndex, color:data.color };
+    // Update user state
+    users[data.user] = {
+        last: {x, y},
+        username: data.user,
+        drawing: true,
+        zoneIndex: data.zoneIndex,
+        color: data.color
+    };
 
-  // Draw username above their zone
-  ctx.font = "16px Arial";
-  ctx.fillStyle = data.color;
-  ctx.textAlign = "center";
-  ctx.fillText(data.user, zoneStartX + zoneSize/2, 20);
+    // Draw username above the zone
+    ctx.font = "16px Arial";
+    ctx.fillStyle = data.color;
+    ctx.textAlign = "center";
+    ctx.fillText(data.user, zoneStartX + zoneWidth / 2, zoneWidth + 18);
 });
 
-// Stop drawing when viewer releases mouse/finger
-socket.on("stopDraw", username=>{
-  if(users[username]) users[username].drawing = false;
+// Stop drawing when viewer signals
+socket.on("stopDraw", username => {
+    if(users[username]) users[username].drawing = false;
 });
 
 // Clear canvas
 socket.on("clearCanvas", ()=>{
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  for(const u in users) delete users[u];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for(const u in users) delete users[u];
 });
 </script>
 </body>
